@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>קלידוסקופ גיאומטרי כחול-לבן עם אפקט הבהוב מהיר</title>
+  <style>
+    body, html {
+      margin: 0; padding: 0; overflow: hidden;
+      background: linear-gradient(135deg, #0000FF, #FFFFFF);
+      direction: rtl;
+      font-family: Impact, sans-serif;
+    }
+    canvas { display: block; }
+
+    /* סרגל האיקונים הוזז מטה ל־40px */
+    #toolbar {
+      position: fixed; top: 40px;
+      left: 50%; transform: translateX(-50%);
+      display: flex; gap: 12px;
+      z-index: 10; transition: opacity 0.3s;
+    }
+    #toolbar button {
+      background: transparent; border: none;
+      cursor: pointer; font-size: 24px; padding: 6px;
+      color: rgba(255,255,255,0.8); font-weight: bold;
+    }
+    #toolbar button.active { color: #FFFFFF; }
+
+    /* סליידרים */
+    #speed-control { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 10; }
+    #size-control  { position: fixed; top: 10px; right: 10px; z-index: 10; }
+    #count-control { position: fixed; top: 10px; left: 10px; z-index: 10; }
+    input[type=range] { cursor: pointer; }
+
+    /* תיבת קלט כותרת בפופ-ארט */
+    #input-overlay {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      background: #FFFFFF; border: 6px dashed #0000FF;
+      box-shadow: 0 0 20px rgba(0,0,255,0.5);
+      padding: 12px; border-radius: 12px;
+      z-index: 20; display: none;
+      flex-direction: column; gap: 8px;
+    }
+    #title-input {
+      width: 220px; height: 60px;
+      font-family: Impact, sans-serif; font-weight: bold;
+      font-size: 18px; color: #0000FF;
+      background: #E0F0FF; border: 4px solid #0000FF;
+      border-radius: 6px; padding: 6px; resize: none;
+    }
+    #btn-close-input {
+      background: #0000FF; color: #FFFFFF;
+      border: none; padding: 6px 12px; cursor: pointer;
+      border-radius: 4px;
+      font-family: Impact, sans-serif; font-weight: bold;
+    }
+
+    /* חתימה קטנה בתחתית */
+    #signature {
+      position: fixed; bottom: 4px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px; color: rgba(255,255,255,0.6);
+      z-index: 5;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <button id="btn-edit">✎</button>
+    <button id="btn-title">◆</button>
+    <button id="btn-center">⊕</button>
+    <button id="btn-linear">↘</button>
+    <button id="btn-linmouse">↔</button>
+    <button id="btn-circle">○</button>
+    <button id="btn-triangle">△</button>
+    <button id="btn-square">□</button>
+  </div>
+
+  <div id="speed-control">
+    <input type="range" id="speed-slider" min="0.2" max="2" step="0.1" value="0.2">
+  </div>
+  <div id="size-control">
+    <input type="range" id="size-slider" min="0.5" max="2" step="0.1" value="0.5">
+  </div>
+  <div id="count-control">
+    <input type="range" id="count-slider" min="20" max="200" step="1" value="20">
+  </div>
+
+  <div id="input-overlay">
+    <textarea id="title-input" rows="2"></textarea>
+    <button id="btn-close-input">✔</button>
+  </div>
+
+  <canvas id="kaleidoscope"></canvas>
+  <div id="signature">by oren gamchi</div>
+
+  <script>
+    const canvas = document.getElementById('kaleidoscope'),
+          ctx    = canvas.getContext('2d');
+    let lightPos={}, centerPos={x:0,y:0}, mouseX=0, mouseY=0;
+
+    function resizeCanvas(){
+      canvas.width = window.innerWidth;
+      canvas.height= window.innerHeight;
+      lightPos = { x: canvas.width*0.3, y: canvas.height*0.3 };
+      centerPos = { x:0, y:0 };
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    let modeEdit=false, modeTitle=false, modeCenter=false,
+        modeLinear=false, modeLinMouse=false,
+        shapeFilter=null, speedMult=0.2, sizeMult=0.5;
+
+    let titleText=["オレン","ジャムチ"];
+    const btns=[
+      {id:'btn-edit',    key:'edit'},
+      {id:'btn-title',   key:'title'},
+      {id:'btn-center',  key:'center'},
+      {id:'btn-linear',  key:'linear'},
+      {id:'btn-linmouse',key:'linmouse'},
+      {id:'btn-circle',  key:0},
+      {id:'btn-triangle',key:1},
+      {id:'btn-square',  key:2}
+    ];
+    btns.forEach(b=>{
+      document.getElementById(b.id).onclick=()=>{
+        if(b.key==='edit'){
+          document.getElementById('input-overlay').style.display='flex';
+          document.getElementById('title-input').value=titleText.join('\n');
+        } else if(b.key==='title'){
+          modeTitle=!modeTitle;
+        } else if(b.key==='center'){
+          modeCenter=!modeCenter; if(modeCenter) modeLinear=modeLinMouse=false;
+        } else if(b.key==='linear'){
+          modeLinear=!modeLinear; if(modeLinear) modeCenter=modeLinMouse=false;
+        } else if(b.key==='linmouse'){
+          modeLinMouse=!modeLinMouse; if(modeLinMouse) modeCenter=modeLinear=false;
+        } else {
+          shapeFilter=(shapeFilter===b.key)?null:b.key;
+        }
+        btns.forEach(x=>document.getElementById(x.id).classList.remove('active'));
+        btns.forEach(x=>{
+          if((x.key==='title'&&modeTitle)||
+             (x.key==='center'&&modeCenter)||
+             (x.key==='linear'&&modeLinear)||
+             (x.key==='linmouse'&&modeLinMouse)||
+             x.key===shapeFilter){
+            document.getElementById(x.id).classList.add('active');
+          }
+        });
+      };
+    });
+
+    document.getElementById('btn-close-input').onclick=()=>{
+      document.getElementById('input-overlay').style.display='none';
+    };
+    document.getElementById('title-input').oninput=e=>{
+      const lines=e.target.value.split('\n');
+      titleText[0]=lines[0]||'';
+      titleText[1]=lines[1]||'';
+    };
+
+    canvas.onclick=e=>{
+      if(modeCenter){
+        const r=canvas.getBoundingClientRect();
+        centerPos.x=e.clientX-r.left-canvas.width/2;
+        centerPos.y=e.clientY-r.top-canvas.height/2;
+      }
+    };
+    document.getElementById('speed-slider').oninput=e=>speedMult=parseFloat(e.target.value);
+    document.getElementById('size-slider' ).oninput=e=>sizeMult=parseFloat(e.target.value);
+    document.getElementById('count-slider').oninput=e=>adjustParticles(parseInt(e.target.value,10));
+
+    let hideTimeout;
+    function resetHide(){
+      ['toolbar','speed-control','size-control','count-control'].forEach(id=>{
+        document.getElementById(id).style.opacity='1';
+      });
+      clearTimeout(hideTimeout);
+      hideTimeout=setTimeout(()=>{
+        ['toolbar','speed-control','size-control','count-control'].forEach(id=>{
+          document.getElementById(id).style.opacity='0';
+        });
+      },3000);
+    }
+    window.onmousemove=e=>{
+      const r=canvas.getBoundingClientRect();
+      mouseX=e.clientX-r.left-canvas.width/2;
+      mouseY=e.clientY-r.top-canvas.height/2;
+      resetHide();
+    };
+    resetHide();
+
+    class Particle{
+      constructor(){
+        this.x=Math.random()*canvas.width;
+        this.y=Math.random()*canvas.height;
+        this.z=Math.random();
+        this.size=Math.random()*15+5;
+        this.speedX=(Math.random()-0.5)*2.4;
+        this.speedY=(Math.random()-0.5)*2.4;
+        this.speedZ=(Math.random()-0.5)*0.012;
+        this.color=['#0000FF','#FFFFFF','#1E90FF','#F0F8FF'][Math.floor(Math.random()*4)];
+        this.angle=Math.random()*Math.PI*2;
+        this.shape=Math.floor(Math.random()*3);
+        this.flyOnZ=Math.random()<0.2;
+      }
+      update(){
+        const pZ=this.z;
+        this.x+=this.speedX*speedMult;
+        this.y+=this.speedY*speedMult;
+        this.z+=this.speedZ*speedMult;
+        this.angle+=0.02*speedMult;
+        if(this.x<0||this.x>canvas.width)this.speedX*=-1;
+        if(this.y<0||this.y>canvas.height)this.speedY*=-1;
+        if(this.flyOnZ&&pZ>=0&&this.z<0)this.speedZ=Math.abs(this.speedZ)*5;
+        else if(!this.flyOnZ&&(this.z<0||this.z>1))this.speedZ*=-1;
+        if(modeLinear&&this.x>=canvas.width&&this.y>=canvas.height){
+          this.x=0;this.y=0;
+        }
+      }
+      draw(cam){
+        const depth=canvas.width,
+              scale=depth/(depth+(this.z+cam.z)*depth),
+              cx=canvas.width/2+cam.x,
+              cy=canvas.height/2+cam.y,
+              x=(this.x-cx)*scale+cam.x,
+              y=(this.y-cy)*scale+cam.y,
+              s=this.size*scale*sizeMult;
+        ctx.save();
+        ctx.translate(x,y);
+        ctx.rotate(this.angle);
+        ctx.fillStyle=this.color;
+        ctx.beginPath();
+        const sh=shapeFilter!==null?shapeFilter:this.shape;
+        if(sh===0) ctx.arc(0,0,s,0,2*Math.PI);
+        else if(sh===1){ctx.moveTo(0,-s);ctx.lineTo(s,s);ctx.lineTo(-s,s);ctx.closePath();}
+        else ctx.rect(-s,-s,s*2,s*2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    const particles=[];
+    function adjustParticles(n){
+      particles.length=0;
+      for(let i=0;i<n;i++)particles.push(new Particle());
+    }
+    adjustParticles(parseInt(document.getElementById('count-slider').value,10));
+
+    let time=0;
+    function drawTitle(cam){
+      const cx=canvas.width/2+cam.x, cy=canvas.height/2+cam.y;
+      const blink = Math.sin(time * 60) > 0 ? '#0000FF' : '#FFFFFF';
+      ctx.save();
+      ctx.translate(cx,cy);
+      ctx.font='bold 48px Impact, sans-serif';
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      ctx.fillStyle=blink;
+      ctx.fillText(titleText[0],0,-20);
+      ctx.fillText(titleText[1],0,20);
+      ctx.restore();
+    }
+
+    function animate(){
+      time += 0.003*speedMult;
+      let cam={ x:0, y:0, z:Math.sin(time*0.5)*0.1 };
+      if(modeCenter)      cam={ x:centerPos.x, y:centerPos.y, z:cam.z };
+      else if(modeLinMouse) cam={ x:mouseX, y:mouseY, z:cam.z };
+      else if(modeLinear){
+        const t=(Date.now()%5000)/5000;
+        cam.x=-canvas.width/2+t*canvas.width;
+        cam.y=-canvas.height/2+t*canvas.height;
+      } else {
+        cam.x=Math.sin(time)*30;
+        cam.y=Math.cos(time*0.8)*20;
+      }
+
+      ctx.fillStyle='rgba(0,0,0,0.05)';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+
+      if(modeTitle) drawTitle(cam);
+
+      const segs=8, ang=2*Math.PI/segs;
+      ctx.save();
+      ctx.translate(canvas.width/2+cam.x, canvas.height/2+cam.y);
+      for(let i=0;i<segs;i++){
+        ctx.rotate(ang);
+        particles.forEach(p=>{ p.update(); p.draw(cam); });
+      }
+      ctx.restore();
+
+      requestAnimationFrame(animate);
+    }
+    animate();
+  </script>
+</body>
+</html>

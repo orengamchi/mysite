@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>מערכת גרפית - מריץ HTML5 מרובה והקלטה</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Reset and general styling */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100vh; width: 100%; overflow: hidden; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #2d2d2d;
+      color: #fff;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto; /* Top-bar, App-Tabs, Main-area, Status-bar */
+    }
+
+    /* --- Layout Components --- */
+    #top-bar { background: #1a1a1a; padding: 8px; display: flex; border-bottom: 1px solid #444; overflow-x: auto; white-space: nowrap; }
+    .tool-group { display: flex; align-items: center; margin-left: 15px; border-left: 1px solid #444; padding-left: 15px; }
+    .tool-group:first-child { margin-left: 0; border-left: none; padding-left: 0; }
+    .tool-btn { background: #333; border: none; color: #fff; padding: 8px 12px; margin: 0 3px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; white-space: nowrap; }
+    .tool-btn i { margin-left: 6px; }
+    .tool-btn:hover { background: #444; }
+    .tool-btn:disabled { background: #555; cursor: not-allowed; opacity: 0.6; }
+
+    /* Dynamic App Tabs */
+    #app-tabs-container { display: flex; background: #1a1a1a; border-bottom: 1px solid #444; overflow-x: auto; white-space: nowrap; padding: 0 5px; }
+    .app-tab {
+      display: flex; align-items: center; padding: 10px 15px; cursor: pointer; border-left: 1px solid #444;
+      white-space: nowrap; position: relative; background: #252525; color: #ccc; max-width: 200px;
+    }
+     .app-tab .tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 10px; }
+    .app-tab:last-child{ border-left: none; }
+    .app-tab:hover { background: #3a3a3a; }
+    .app-tab.active { background: #0078d7; color: #fff; }
+    .app-tab .close-tab-btn { background: transparent; border: none; color: #aaa; cursor: pointer; font-size: 14px; padding: 0 5px; margin-right: -5px; line-height: 1; opacity: 0.7; }
+    .app-tab .close-tab-btn:hover { color: #fff; opacity: 1; }
+    .app-tab.active .close-tab-btn { color: #eee; }
+
+    /* Adjusted Main Area - No Side Palette */
+    #main-area { display: grid; grid-template-columns: 1fr 300px; height: 100%; overflow: hidden; }
+
+    #viewer-container { background: #1e1e1e; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+    #properties-panel { background: #252525; border-right: 1px solid #444; padding: 10px; overflow-y: auto; }
+    .panel-title { font-weight: bold; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #444; }
+    .property-group { margin-bottom: 15px; display:none; }
+    .property-group.active-properties { display:block; }
+    .property-group-title { font-weight: bold; margin-bottom: 8px; display: flex; justify-content: space-between; cursor: pointer; }
+    .property-item { margin-bottom: 8px; }
+    .property-item label { display: block; margin-bottom: 3px; font-size: 13px; }
+    .property-item input, .property-item select, .property-item textarea, .property-item span, .property-item button { width: 100%; padding: 6px; background: #333; border: 1px solid #444; border-radius: 3px; color: #fff; font-size: 13px; }
+    .property-item span { background: none; border: none; padding: 0; color: #ccc; word-wrap: break-word; }
+    .property-item textarea { min-height: 60px; }
+    .property-item input[type="color"] { height: 30px; padding: 2px; min-width: 30px;}
+    .property-item button { cursor: pointer; background-color: #0078d7; }
+    .property-item button:hover { background-color: #005a9e; }
+
+
+    #status-bar { background: #1a1a1a; padding: 5px 10px; font-size: 12px; border-top: 1px solid #444; display: flex; justify-content: space-between; }
+
+    /* --- Workspaces & Canvases --- */
+    .workspace { display: none; flex-grow: 1; overflow: hidden; position: relative; width: 100%; height: 100%; }
+    .workspace.active { display: flex; flex-direction: column; }
+
+    /* HTML Runner Workspace Specifics */
+    #html-runner-iframe-container { flex-grow: 1; position: relative; background-color: #111; }
+    .html-runner-iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; border: none; background-color: #fff; }
+    .html-runner-iframe.active-iframe { display: block; }
+    #html-runner-placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: #777; font-size: 1.5em; }
+
+    /* Recording Workspace Specifics */
+    #recording-controls { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(30,30,30,0.95); padding: 20px; border-radius: 8px; z-index: 100; width: 90%; max-width: 350px; border: 1px solid #555; }
+    #recording-controls h3{ margin-bottom: 15px; text-align: center;}
+    #recording-controls label { margin-top:10px;}
+    #start-record-btn { width:100%; margin-top:15px;}
+
+    /* Notifications & Overlays */
+    #notification { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(220,53,69,0.9); color: #fff; padding: 10px 20px; border-radius: 4px; font-size: 14px; z-index: 2010; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
+    #notification.show { opacity: 1; }
+    #preOverlay, #sideCounter, #borderOverlay { display: none; position: fixed; z-index: 10000; }
+    #preOverlay { top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); color: yellow; font-size: 100px; font-weight: bold; align-items: center; justify-content: center; }
+    #sideCounter { top: 20px; left: 20px; background: rgba(255,255,0,0.8); color: #000; font-size: 40px; font-weight: bold; padding: 10px; border-radius: 8px;}
+    #borderOverlay { top: 0; left: 0; right: 0; bottom: 0; box-sizing: border-box; border: 10px solid yellow; pointer-events: none; }
+
+    /* Responsive */
+    @media (max-width: 900px) { #main-area { grid-template-columns: 1fr 250px; } }
+    @media (max-width: 768px) { #main-area { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } #properties-panel { max-height: 40vh; border-right: none; border-top: 1px solid #444; } }
+    @media (max-width: 480px) { #top-bar .tool-btn { font-size: 10px; padding: 6px 8px; } #top-bar .tool-btn i { margin-left: 4px; font-size: 1em; } .app-tab { padding: 8px 10px; font-size: 0.9em;} }
+  </style>
+</head>
+<body>
+  <header id="top-bar" role="toolbar" aria-label="סרגל כלים ראשי">
+    <div class="tool-group">
+      <button class="tool-btn" id="html-runner-load-btn-top" aria-label="טען קובץ HTML"><i class="fas fa-upload"></i> טען HTML</button>
+      <button class="tool-btn" id="html-runner-reload-btn-top" disabled aria-label="טען מחדש אפליקציה פעילה"><i class="fas fa-sync-alt"></i> רענן אפליקציה</button>
+    </div>
+    <div class="tool-group">
+      <button class="tool-btn" id="record-btn" aria-label="הקלטה"><i class="fas fa-video"></i> הקלטה</button>
+    </div>
+  </header>
+
+  <nav id="app-tabs-container" role="tablist" aria-label="אפליקציות טעונות">
+     <div class="mode-tab" role="tab" aria-selected="false" aria-controls="recording-workspace" data-workspace="recording">הקלטת מסך</div>
+  </nav>
+
+  <main id="main-area">
+    <section id="viewer-container" aria-label="אזור תצוגה מרכזי">
+      <div id="html-runner-workspace" class="workspace active" role="tabpanel">
+         <div id="html-runner-iframe-container">
+             <div id="html-runner-placeholder">לחץ על "טען HTML" בסרגל העליון</div>
+         </div>
+      </div>
+      <div id="recording-workspace" class="workspace" role="tabpanel">
+        <div id="recording-controls">
+          <h3>הקלטת מסך</h3>
+          <div> <label for="resolutionSelect">רזולוציה:</label> <select id="resolutionSelect"> <option value="1080">HD (1920×1080)</option> <option value="canvas">Window Size</option> <option value="4k">4K (3840×2160)</option> <option value="8k">8K (7680×4320)</option> </select> </div>
+          <button id="start-record-btn" aria-label="התחל הקלטה"><i class="fas fa-circle"></i> התחל הקלטה</button>
+          <div id="recordStatus" aria-live="polite"></div>
+        </div>
+      </div>
+      </section>
+
+    <aside id="properties-panel" aria-labelledby="properties-panel-title">
+      <h2 class="panel-title" id="properties-panel-title">מאפיינים</h2>
+      <div id="html-runner-properties" class="property-group active-properties">
+           <div class="property-group-title">מאפייני אפליקציה פעילה</div>
+           <div class="property-item">
+               <label>שם קובץ:</label>
+               <span id="html-runner-loaded-file">לא נטען קובץ</span>
+           </div>
+           <div class="property-item">
+               <label>הרשאות Sandbox:</label>
+               <textarea id="html-runner-sandbox-attrs" rows="4" readonly style="font-size: 11px; background:#222;"></textarea>
+           </div>
+           <div class="property-item">
+               <p style="font-size: 12px; color: #aaa;">
+                   הערה: תוכן ה-HTML רץ בסביבה מבודדת (sandbox) מטעמי אבטחה.
+               </p>
+           </div>
+           <hr style="border-color: #444; margin: 15px 0;">
+           <div class="property-group-title">תקשורת עם אפליקציה</div>
+           <div class="property-item">
+               <label for="message-type-input">סוג הודעה:</label>
+               <input type="text" id="message-type-input" placeholder="לדוגמה: updateData">
+           </div>
+           <div class="property-item">
+               <label for="message-payload-input">תוכן הודעה (JSON):</label>
+               <textarea id="message-payload-input" rows="3" placeholder='לדוגמה: {"key": "value", "count": 10}'></textarea>
+           </div>
+           <div class="property-item">
+               <button id="send-message-to-iframe-btn" disabled><i class="fas fa-paper-plane"></i> שלח הודעה לאפליקציה</button>
+           </div>
+           <div class="property-item">
+                <label>הודעה אחרונה שהתקבלה:</label>
+                <span id="last-message-received" style="color:#0f0; font-family: monospace; font-size: 11px; white-space: pre-wrap;">-</span>
+           </div>
+      </div>
+      <div id="recording-properties" class="property-group">
+         <div class="property-group-title">אפשרויות הקלטה</div>
+         <div class="property-item"> <label for="record-duration-prop">משך הקלטה (שניות, 0 = ללא הגבלה):</label> <input type="number" id="record-duration-prop" value="0" min="0"> </div>
+         <div class="property-item"> <label for="record-format-prop">פורמט:</label> <select id="record-format-prop"> <option value="webm">WebM (מומלץ)</option> <option value="mp4" disabled>MP4 (לא נתמך ישירות)</option> </select> </div>
+         <div class="property-item"> <label for="record-framerate-prop">קצב פריימים (FPS):</label> <select id="record-framerate-prop"> <option value="30">30</option> <option value="60">60</option> <option value="24">24</option> </select> </div>
+         <div class="property-item"> <label for="record-quality-prop">איכות (Bitrate Mbps):</label> <select id="record-quality-prop"> <option value="8">Standard (8)</option> <option value="15">High (15)</option> <option value="25">Very High (25)</option> <option value="5">Low (5)</option> </select> </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer id="status-bar">
+    <div>מוכן</div>
+    <div id="status-resolution">רזולוציה: -</div>
+    <div id="status-fps" aria-live="polite">FPS: --</div> </footer>
+
+  <input type="file" id="html-runner-file-input" accept=".html,.htm" style="display:none;">
+  <div id="notification"></div> <div id="preOverlay"></div> <div id="sideCounter"></div> <div id="borderOverlay"></div>
+
+  <script>
+    // --- Global DOM Elements ---
+    const body = document.body;
+    const htmlRunnerIframeContainer = document.getElementById('html-runner-iframe-container');
+    const htmlRunnerPlaceholder = document.getElementById('html-runner-placeholder');
+    const htmlRunnerFileInput = document.getElementById('html-runner-file-input');
+    const htmlRunnerReloadBtnTop = document.getElementById('html-runner-reload-btn-top');
+    const htmlRunnerLoadBtnTop = document.getElementById('html-runner-load-btn-top');
+    const htmlRunnerLoadedFileSpan = document.getElementById('html-runner-loaded-file');
+    const htmlRunnerSandboxAttrs = document.getElementById('html-runner-sandbox-attrs');
+    const sendMessageBtn = document.getElementById('send-message-to-iframe-btn');
+    const messageTypeInput = document.getElementById('message-type-input');
+    const messagePayloadInput = document.getElementById('message-payload-input');
+    const lastMessageReceivedSpan = document.getElementById('last-message-received');
+
+
+    const modeTabsContainer = document.getElementById('app-tabs-container');
+    const viewerContainer = document.getElementById('viewer-container');
+    const propertiesPanel = document.getElementById('properties-panel');
+    const statusBar = document.getElementById('status-bar');
+    const statusResolutionEl = document.getElementById('status-resolution');
+    const statusFpsEl = document.getElementById('status-fps');
+
+    const recordControls = document.getElementById('recording-controls');
+    const startRecordBtn = document.getElementById('start-record-btn');
+    const recordStatusEl = document.getElementById('recordStatus');
+    const resolutionSelect = document.getElementById('resolutionSelect');
+    const preOverlay = document.getElementById('preOverlay');
+    const sideCounter = document.getElementById('sideCounter');
+    const borderOverlay = document.getElementById('borderOverlay');
+
+    // --- Global State ---
+    let W = window.innerWidth;
+    let H = window.innerHeight;
+    let currentWorkspace = 'html-runner';
+    let loadedApps = {}; // { id: { name: 'file.html', content: '...', iframe: element, tab: element } }
+    let activeAppId = null;
+    let mediaRecorder;
+    let recordedChunks = [];
+    let screenStream;
+    let countdownInterval;
+
+    // --- Utility Functions ---
+    function updateViewerSize() {
+        W = viewerContainer.clientWidth;
+        H = viewerContainer.clientHeight;
+        statusResolutionEl.textContent = `רזולוציה: ${Math.round(W)}x${Math.round(H)}`;
+    }
+
+    function showNotification(message, type = 'info') {
+        const notificationDiv = document.getElementById('notification');
+        if (!notificationDiv) return;
+        notificationDiv.textContent = message;
+        notificationDiv.className = 'show';
+        if (type === 'success') notificationDiv.style.backgroundColor = 'rgba(40,167,69,0.9)';
+        else if (type === 'error') notificationDiv.style.backgroundColor = 'rgba(220,53,69,0.9)';
+        else notificationDiv.style.backgroundColor = 'rgba(23,162,184,0.9)';
+        setTimeout(() => { notificationDiv.classList.remove('show'); }, 3000);
+    }
+
+    // --- Workspace Switching ---
+    function switchWorkspace(workspaceName, appId = null) {
+        currentWorkspace = workspaceName;
+        activeAppId = appId;
+
+        // Update Mode Tabs (Recording vs App Tabs)
+        document.querySelectorAll('#app-tabs-container .mode-tab').forEach(tab => {
+             tab.classList.toggle('active', tab.dataset.workspace === workspaceName && !appId);
+             tab.setAttribute('aria-selected', tab.dataset.workspace === workspaceName && !appId);
+        });
+        document.querySelectorAll('#app-tabs-container .app-tab').forEach(tab => {
+             tab.classList.toggle('active', tab.dataset.appId === appId);
+             tab.setAttribute('aria-selected', tab.dataset.appId === appId);
+        });
+
+        // Update Workspaces Visibility
+        document.querySelectorAll('.workspace').forEach(ws => {
+            ws.classList.toggle('active', ws.id === workspaceName + '-workspace');
+        });
+
+        // Update Properties Panel Visibility
+        document.querySelectorAll('.property-group').forEach(pg => {
+            pg.classList.toggle('active-properties', pg.id === workspaceName + '-properties');
+        });
+
+        // Update Iframe Visibility
+        document.querySelectorAll('.html-runner-iframe').forEach(iframe => {
+            iframe.classList.toggle('active-iframe', iframe.dataset.appId === appId);
+        });
+
+        htmlRunnerPlaceholder.style.display = (workspaceName === 'html-runner' && !getActiveIframe()) ? 'flex' : 'none';
+
+        // Update specific panels/controls
+        if (workspaceName === 'html-runner') {
+            populateHtmlRunnerProperties();
+            htmlRunnerReloadBtnTop.disabled = !activeAppId;
+            sendMessageBtn.disabled = !activeAppId; // Enable send message btn only if an app is active
+        } else if (workspaceName === 'recording') {
+             populateRecordingProperties();
+             htmlRunnerReloadBtnTop.disabled = true;
+             sendMessageBtn.disabled = true; // Disable send message btn
+        }
+
+        updateViewerSize();
+    }
+
+    // --- HTML Runner Logic ---
+    function loadHtmlFile(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const appId = `app-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+            const appContent = e.target.result;
+
+            const iframe = document.createElement('iframe');
+            iframe.className = 'html-runner-iframe';
+            iframe.dataset.appId = appId;
+            // ** IMPORTANT SECURITY**: Sandbox attributes
+            // "allow-scripts": Allows the iframe to run scripts.
+            // "allow-same-origin": Allows the iframe to be treated as same-origin (needed for srcdoc to work reliably and potentially for postMessage without '*')
+            // "allow-forms": Allows form submissions.
+            // "allow-modals": Allows window.alert, confirm, prompt.
+            // "allow-popups": Allows window.open (use with caution).
+            // "allow-presentation": Allows presentation mode.
+            // OMIT "allow-top-navigation" and "allow-top-navigation-by-user-activation" unless absolutely necessary and trusted.
+            iframe.sandbox = "allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-presentation";
+            iframe.srcdoc = appContent;
+            htmlRunnerIframeContainer.appendChild(iframe);
+
+            const tab = document.createElement('div');
+            tab.className = 'app-tab'; tab.dataset.appId = appId; tab.role = 'tab'; tab.setAttribute('aria-controls', `iframe-${appId}`);
+            const labelSpan = document.createElement('span'); labelSpan.className = 'tab-label'; labelSpan.textContent = file.name; labelSpan.title = file.name; tab.appendChild(labelSpan);
+            const closeBtn = document.createElement('button'); closeBtn.className = 'close-tab-btn'; closeBtn.innerHTML = '&times;'; closeBtn.setAttribute('aria-label', `סגור את ${file.name}`);
+            closeBtn.onclick = (event) => { event.stopPropagation(); closeAppTab(appId); }; tab.appendChild(closeBtn);
+            tab.onclick = () => { switchWorkspace('html-runner', appId); };
+
+            const recordingTab = modeTabsContainer.querySelector('[data-workspace="recording"]');
+            modeTabsContainer.insertBefore(tab, recordingTab);
+
+            loadedApps[appId] = { name: file.name, content: appContent, iframe: iframe, tab: tab };
+            switchWorkspace('html-runner', appId);
+            showNotification(`"${file.name}" נטען בהצלחה.`, "success");
+        }
+        reader.onerror = function() { showNotification("שגיאה בקריאת הקובץ.", "error"); }
+        reader.readAsText(file);
+    }
+
+    function reloadHtmlIframe() {
+        const app = loadedApps[activeAppId];
+        if (app && app.iframe) {
+            // Re-setting srcdoc is the standard way to reload its content
+            app.iframe.srcdoc = app.content;
+            showNotification(`"${app.name}" נטען מחדש.`, "info");
+        } else if (activeAppId) { showNotification("שגיאה: לא נמצא iframe פעיל לרענון.", "error"); }
+        else { showNotification("אין אפליקציה פעילה לרענון.", "error"); }
+    }
+
+     function closeAppTab(appId) {
+        const app = loadedApps[appId];
+        if (app) {
+            if (app.iframe) app.iframe.remove();
+            if (app.tab) app.tab.remove();
+            delete loadedApps[appId];
+            if (activeAppId === appId) {
+                const remainingAppIds = Object.keys(loadedApps);
+                if (remainingAppIds.length > 0) { switchWorkspace('html-runner', remainingAppIds[remainingAppIds.length - 1]); }
+                else { activeAppId = null; htmlRunnerPlaceholder.style.display = 'flex'; htmlRunnerReloadBtnTop.disabled = true; populateHtmlRunnerProperties(); }
+            }
+        }
+    }
+
+    function getActiveIframe() { return activeAppId ? loadedApps[activeAppId]?.iframe : null; }
+    function getActiveAppId() { return activeAppId; }
+
+     function populateHtmlRunnerProperties() {
+        const container = document.getElementById('html-runner-properties');
+        const app = activeAppId ? loadedApps[activeAppId] : null;
+        const loadedFileNameSpanProp = document.getElementById('html-runner-loaded-file'); // Corrected ID
+        const sandboxAttrsAreaProp = document.getElementById('html-runner-sandbox-attrs'); // Corrected ID
+
+        if (app) {
+            loadedFileNameSpanProp.textContent = app.name;
+            sandboxAttrsAreaProp.value = app.iframe?.sandbox?.value || "N/A";
+        } else {
+            loadedFileNameSpanProp.textContent = 'לא נטען קובץ';
+            sandboxAttrsAreaProp.value = '';
+        }
+         container.classList.toggle('active-properties', currentWorkspace === 'html-runner');
+    }
+
+    // --- PostMessage Communication ---
+    function sendMessageToActiveIframe() {
+        const activeIframe = getActiveIframe();
+        if (!activeIframe || !activeIframe.contentWindow) {
+            showNotification("אין אפליקציה פעילה לשליחת הודעה.", "error");
+            return;
+        }
+
+        const messageType = messageTypeInput.value.trim();
+        let payload;
+        try {
+            // Allow empty payload, treat as null
+            payload = messagePayloadInput.value.trim() ? JSON.parse(messagePayloadInput.value) : null;
+        } catch (e) {
+            showNotification("תוכן ההודעה אינו JSON תקין.", "error");
+            return;
+        }
+
+        if (!messageType) {
+             showNotification("יש לציין סוג הודעה.", "error");
+            return;
+        }
+
+        const message = {
+            type: messageType,
+            payload: payload,
+            source: 'parent' // Indicate message is from the main app
+        };
+
+        // Send the message to the iframe's window
+        // Using '*' for targetOrigin is less secure but often necessary with srcdoc/blobs
+        // A more secure approach involves the iframe sending its origin first, but adds complexity.
+        activeIframe.contentWindow.postMessage(message, '*');
+
+        showNotification(`הודעה נשלחה לאפליקציה "${loadedApps[activeAppId].name}".`, "success");
+        // Clear inputs after sending? Optional.
+        // messageTypeInput.value = '';
+        // messagePayloadInput.value = '';
+    }
+
+    function handleIncomingMessage(event) {
+        // Basic security check (optional but recommended if parent origin is known)
+        // if (event.origin !== 'expected_origin_if_known') {
+        //     console.warn("Message received from unexpected origin:", event.origin);
+        //     return;
+        // }
+
+        const messageData = event.data;
+
+        // Ignore messages that don't match our expected structure (simple check)
+        if (typeof messageData !== 'object' || !messageData.type || !messageData.sourceAppId) {
+            // console.log("Ignoring non-protocol message:", event.data);
+            return;
+        }
+
+        console.log("Message received from App:", messageData.sourceAppId, messageData);
+        lastMessageReceivedSpan.textContent = JSON.stringify(messageData, null, 2); // Display formatted JSON
+
+        // Example: Forwarding message if targetAppId is specified
+        if (messageData.targetAppId && messageData.targetAppId !== 'parent') {
+            const targetApp = loadedApps[messageData.targetAppId];
+            if (targetApp && targetApp.iframe && targetApp.iframe.contentWindow) {
+                // Re-post the message to the target iframe
+                targetApp.iframe.contentWindow.postMessage(messageData, '*');
+                showNotification(`הודעה מ-${messageData.sourceAppId} הועברה ל-${messageData.targetAppId}.`, "info");
+            } else {
+                showNotification(`שגיאה: אפליקציית יעד (${messageData.targetAppId}) לא נמצאה.`, "error");
+            }
+        } else {
+            // Handle message intended for the parent app
+            switch (messageData.type) {
+                case 'statusUpdate':
+                    showNotification(`סטטוס מ-${loadedApps[messageData.sourceAppId]?.name || messageData.sourceAppId}: ${JSON.stringify(messageData.payload)}`, "success");
+                    break;
+                case 'requestData':
+                    // Example: Send some data back to the requesting app
+                    const requestingApp = loadedApps[messageData.sourceAppId];
+                    if (requestingApp && requestingApp.iframe && requestingApp.iframe.contentWindow) {
+                        const response = {
+                            type: 'dataResponse',
+                            payload: { requestedData: `נתונים לדוגמה מהאפליקציה הראשית - ${new Date().toLocaleTimeString()}` },
+                            source: 'parent'
+                        };
+                        requestingApp.iframe.contentWindow.postMessage(response, '*');
+                    }
+                    break;
+                // Add more cases to handle different message types from child apps
+                default:
+                    console.log("Parent received unhandled message type:", messageData.type);
+            }
+        }
+    }
+    // Listen for messages from iframes
+    window.addEventListener('message', handleIncomingMessage);
+
+
+    // --- Recording Logic ---
+     function populateRecordingProperties() { /* ... */
+        const container = document.getElementById('recording-properties');
+        container.innerHTML = `
+         <div class="property-group-title">אפשרויות הקלטה</div>
+         <div class="property-item"> <label for="record-duration-prop">משך הקלטה (שניות, 0 = ללא הגבלה):</label> <input type="number" id="record-duration-prop" value="0" min="0"> </div>
+         <div class="property-item"> <label for="record-format-prop">פורמט:</label> <select id="record-format-prop"> <option value="webm">WebM (מומלץ)</option> <option value="mp4" disabled>MP4 (לא נתמך ישירות)</option> </select> </div>
+         <div class="property-item"> <label for="record-framerate-prop">קצב פריימים (FPS):</label> <select id="record-framerate-prop"> <option value="30">30</option> <option value="60">60</option> <option value="24">24</option> </select> </div>
+         <div class="property-item"> <label for="record-quality-prop">איכות (Bitrate Mbps):</label> <select id="record-quality-prop"> <option value="8">Standard (8)</option> <option value="15">High (15)</option> <option value="25">Very High (25)</option> <option value="5">Low (5)</option> </select> </div>`;
+         container.classList.toggle('active-properties', currentWorkspace === 'recording');
+    }
+    async function startRecording() { /* ... */
+        startRecordBtn.disabled = true; recordStatusEl.textContent = 'מבקש הרשאות...';
+        const targetFps = parseInt(document.getElementById('record-framerate-prop')?.value || '30');
+        const qualityBps = parseInt(document.getElementById('record-quality-prop')?.value || '8') * 1000000;
+        const durationSec = parseInt(document.getElementById('record-duration-prop')?.value || '0');
+        let width, height; const resValue = resolutionSelect.value;
+        if (resValue === '4k') { width = 3840; height = 2160; } else if (resValue === '8k') { width = 7680; height = 4320; } else if (resValue === 'canvas') { width = W; height = H; } else { width = 1920; height = 1080; }
+        try {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { width: { ideal: width }, height: { ideal: height }, frameRate: { ideal: targetFps } }, audio: false });
+            preOverlay.style.display = 'flex'; for (let i = 3; i > 0; i--) { preOverlay.textContent = i; await new Promise(r => setTimeout(r, 1000)); } preOverlay.style.display = 'none'; borderOverlay.style.display = 'block';
+            const mimeType = 'video/webm;codecs=vp9'; if (!MediaRecorder.isTypeSupported(mimeType)) { showNotification('פורמט WebM/VP9 אינו נתמך.', 'error'); throw new Error('Unsupported mimeType'); }
+            recordedChunks = []; mediaRecorder = new MediaRecorder(screenStream, { mimeType: mimeType, videoBitsPerSecond: qualityBps });
+            mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); };
+            mediaRecorder.onstop = () => { borderOverlay.style.display = 'none'; sideCounter.style.display = 'none'; clearInterval(countdownInterval); recordStatusEl.textContent = 'מעבד וידאו...'; const blob = new Blob(recordedChunks, { type: mimeType }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `recording_${Date.now()}.webm`; a.click(); URL.revokeObjectURL(url); recordStatusEl.textContent = 'הקלטה הסתיימה והורדה.'; startRecordBtn.disabled = false; startRecordBtn.innerHTML = '<i class="fas fa-circle"></i> התחל הקלטה'; startRecordBtn.onclick = startRecording; stopScreenStream(); };
+            mediaRecorder.onerror = (event) => { console.error("MediaRecorder Error:", event.error); showNotification(`שגיאת הקלטה: ${event.error.name}`, 'error'); stopRecording(); };
+            mediaRecorder.start(); recordStatusEl.textContent = 'מקליט...'; startRecordBtn.innerHTML = '<i class="fas fa-stop"></i> עצור הקלטה'; startRecordBtn.onclick = stopRecording; startRecordBtn.disabled = false;
+            if (durationSec > 0) { let remaining = durationSec; sideCounter.textContent = remaining; sideCounter.style.display = 'block'; countdownInterval = setInterval(() => { remaining--; sideCounter.textContent = remaining; if (remaining <= 0) stopRecording(); }, 1000); setTimeout(stopRecording, durationSec * 1000); }
+        } catch (err) { console.error("Error starting recording:", err); recordStatusEl.textContent = `שגיאה: ${err.message}`; showNotification(`לא ניתן להתחיל הקלטה: ${err.message}`, 'error'); startRecordBtn.disabled = false; stopScreenStream(); }
+    }
+    function stopRecording() { /* ... */ if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); stopScreenStream(); startRecordBtn.disabled = true; startRecordBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מעבד...'; startRecordBtn.onclick = startRecording; clearInterval(countdownInterval); borderOverlay.style.display = 'none'; sideCounter.style.display = 'none'; }
+    function stopScreenStream() { /* ... */ if (screenStream) { screenStream.getTracks().forEach(track => track.stop()); screenStream = null; } }
+
+    // --- Main Animation Loop ---
+    function mainLoop(timestamp) { requestAnimationFrame(mainLoop); } // Minimal loop
+
+    // --- Event Listeners ---
+    window.addEventListener('resize', updateViewerSize);
+    modeTabsContainer.addEventListener('click', (e) => {
+        const tab = e.target.closest('.mode-tab'); // Handles built-in tabs
+        if (tab && tab.dataset.workspace) switchWorkspace(tab.dataset.workspace);
+        // Dynamic app tab clicks are handled in loadHtmlFile
+    });
+
+    // Top bar listeners
+    htmlRunnerLoadBtnTop.onclick = () => htmlRunnerFileInput.click();
+    htmlRunnerFileInput.onchange = (event) => { if (event.target.files.length > 0) loadHtmlFile(event.target.files[0]); event.target.value = null; };
+    htmlRunnerReloadBtnTop.onclick = reloadHtmlIframe;
+    document.getElementById('record-btn').onclick = () => switchWorkspace('recording');
+
+    // Recording controls listener
+    startRecordBtn.onclick = startRecording;
+
+    // Send message button listener
+    sendMessageBtn.onclick = sendMessageToActiveIframe;
+
+
+    // --- Initialization ---
+    function initializeApp() {
+        updateViewerSize();
+        switchWorkspace('html-runner'); // Start with HTML runner workspace
+        requestAnimationFrame(mainLoop); // Start minimal loop
+    }
+
+    initializeApp();
+
+  </script>
+</body>
+</html>

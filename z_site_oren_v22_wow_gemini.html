@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oren Gamchi - Interactive Portfolio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --mode-bg: #1a1a2e;
+      --icon-color: #e94560;
+      --overlay-text: #ffffff;
+      --overlay-font: "VT323", monospace;
+      --transition-duration: 0.8s;
+      --transition-timing: cubic-bezier(0.165, 0.84, 0.44, 1);
+    }
+
+    * {
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+      touch-action: manipulation; /* Prevent default touch actions like double tap zoom */
+    }
+
+    html, body {
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:var(--mode-bg);
+    }
+
+    body {
+      font-family:Arial, sans-serif;
+      transition: all 0.5s ease;
+      -webkit-text-size-adjust: none; /* Prevent text size adjustment on mobile */
+    }
+
+    .scene {
+      width:100%;
+      height:100%;
+      perspective:1200px;
+      position:relative;
+      overflow: hidden;
+    }
+
+    .slides {
+      width:100%;
+      height:100%;
+      transform-style:preserve-3d;
+      transition:transform var(--transition-duration) var(--transition-timing);
+    }
+
+    .slide {
+      position:absolute;
+      width:100%;
+      height:100%;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      backface-visibility:hidden;
+      overflow:hidden;
+      transition:
+        opacity var(--transition-duration) var(--transition-timing),
+        transform var(--transition-duration) var(--transition-timing),
+        filter var(--transition-duration) var(--transition-timing);
+      transform-origin: center center;
+      opacity: 0.3;
+      filter: blur(2px);
+      background: rgba(0,0,0,0.2); /* Default background */
+    }
+
+    .slide.active {
+      opacity: 1;
+      filter: blur(0);
+      z-index: 2;
+    }
+
+    .slide canvas {
+      position:absolute;
+      top:0;
+      left:0;
+      width:100%;
+      height:100%;
+      filter: blur(4px);
+      transition:filter var(--transition-duration) var(--transition-timing);
+      z-index: 0;
+    }
+
+    .slide.active canvas {
+      filter: blur(0);
+    }
+
+    /* Shape-specific backgrounds */
+    .slide[data-shape="circle"] {
+      background: radial-gradient(circle, rgba(233,69,96,0.1), transparent 70%);
+    }
+
+    .slide[data-shape="square"] {
+      background: repeating-linear-gradient(45deg, rgba(34,209,238,0.1), rgba(34,209,238,0.1) 2px, transparent 2px, transparent 8px);
+    }
+
+    .slide[data-shape="triangle"] {
+      background: repeating-linear-gradient(60deg, rgba(247,216,68,0.1), rgba(247,216,68,0.1) 2px, transparent 2px, transparent 6px);
+    }
+
+    .slide[data-shape="hexagon"] {
+      background: repeating-linear-gradient(30deg, rgba(156,39,176,0.1), rgba(156,39,176,0.1) 2px, transparent 2px, transparent 10px);
+    }
+
+    .slide[data-shape="star"] {
+      background: radial-gradient(circle at center, rgba(255,152,0,0.1), transparent 80%);
+    }
+
+    .slide[data-shape="diamond"] {
+      background: repeating-linear-gradient(-45deg, rgba(76,175,80,0.1), rgba(76,175,80,0.1) 2px, transparent 2px, transparent 8px);
+    }
+
+    .slide[data-shape="line"] {
+      background: repeating-linear-gradient(90deg, rgba(244,67,54,0.1), rgba(244,67,54,0.1) 1px, transparent 1px, transparent 4px);
+    }
+
+    .slide[data-shape="cross"] {
+      background:
+        repeating-linear-gradient(0deg, rgba(63,81,181,0.1), rgba(63,81,181,0.1) 1px, transparent 1px, transparent 6px),
+        repeating-linear-gradient(90deg, rgba(63,81,181,0.1), rgba(63,81,181,0.1) 1px, transparent 1px, transparent 6px);
+    }
+
+    .slide[data-shape="spiral"] {
+      background:
+        radial-gradient(circle at center, transparent 60%, rgba(255,105,180,0.1) 60.5%, transparent 61%) 0 0 / 50px 50px,
+        radial-gradient(circle at center, transparent 60%, rgba(255,105,180,0.1) 60.5%, transparent 61%) 25px 25px / 50px 50px;
+    }
+
+    .slide[data-shape="wave"] {
+      background:
+        linear-gradient(135deg, rgba(0,191,255,0.1) 25%, transparent 25%) -50px 0,
+        linear-gradient(225deg, rgba(0,191,255,0.1) 25%, transparent 25%) -50px 0,
+        linear-gradient(315deg, rgba(0,191,255,0.1) 25%, transparent 25%),
+        linear-gradient(45deg, rgba(0,191,255,0.1) 25%, transparent 25%);
+    }
+
+    .slide[data-shape="grid"] {
+      background:
+        linear-gradient(rgba(138,43,226,0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(138,43,226,0.1) 1px, transparent 1px);
+    }
+
+    .slide[data-shape="bubbles"] {
+      background:
+        radial-gradient(circle at 10% 20%, rgba(50,205,50,0.1) 0%, transparent 10%),
+        radial-gradient(circle at 90% 30%, rgba(50,205,50,0.1) 0%, transparent 15%),
+        radial-gradient(circle at 50% 80%, rgba(50,205,50,0.1) 0%, transparent 20%);
+    }
+
+    /* Overlay styles */
+    .overlay {
+      position:absolute;
+      top:30%;
+      left:50%;
+      transform:translate(-50%,-50%);
+      pointer-events:none;
+      text-align:center;
+      opacity:0;
+      transition:opacity var(--transition-duration) var(--transition-timing);
+      z-index:3;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .slide.active .overlay {
+      opacity:1;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(-50%, -50%); }
+      50% { transform: translate(-50%, -55%); }
+    }
+
+    .overlay h1, .overlay h2 {
+      font-family: var(--overlay-font);
+      color: var(--overlay-text);
+      text-transform: uppercase;
+      letter-spacing:2px;
+      margin: 0.2em 0;
+    }
+
+    .overlay h1 {
+      font-size:2.1em;
+      text-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+
+    .overlay h2 {
+      font-size:1.4em;
+    }
+
+    /* Icon Construction - Centered in viewport */
+    .icon-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    .icon-construction {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .icon-part {
+      position: absolute;
+      background: var(--icon-color);
+      opacity: 0;
+      transform: scale(0.5);
+      transition: all 0.5s ease-out;
+      border-radius: 50%; /* Default to circle, overridden by shape-specific styles */
+      transform-origin: center;
+    }
+
+    /* Motion lines for shapes */
+    .icon-part::before {
+      content: '';
+      position: absolute;
+      background: rgba(255,255,255,0.3);
+      transform-origin: center;
+      pointer-events: none;
+    }
+
+    .slide.active .icon-part {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* Shape-specific icons with motion lines */
+    .slide[data-shape="circle"] .icon-part {
+      border-radius: 50%;
+    }
+    .slide[data-shape="circle"] .icon-part::before {
+      width: 150%;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(0deg);
+      animation: rotateLine 4s linear infinite;
+    }
+
+    .slide[data-shape="square"] .icon-part {
+      border-radius: 5px;
+    }
+    .slide[data-shape="square"] .icon-part::before {
+      width: 150%;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(45deg);
+      animation: pulseLine 3s ease-in-out infinite;
+    }
+
+    .slide[data-shape="triangle"] .icon-part {
+      clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+      border-radius: 0; /* Override default */
+    }
+    .slide[data-shape="triangle"] .icon-part::before {
+      width: 150%;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(60deg);
+      animation: rotateLine 5s linear infinite;
+    }
+
+    .slide[data-shape="hexagon"] .icon-part {
+      clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+      border-radius: 0; /* Override default */
+    }
+    .slide[data-shape="hexagon"] .icon-part::before {
+      width: 150%;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(30deg);
+      animation: pulseLine 4s ease-in-out infinite;
+    }
+
+    .slide[data-shape="star"] .icon-part {
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+      border-radius: 0; /* Override default */
+    }
+    .slide[data-shape="star"] .icon-part::before {
+      width: 150%;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(72deg);
+      animation: rotateLine 6s linear infinite;
+    }
+
+    .slide[data-shape="diamond"] .icon-part {
+      clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+      border-radius: 0; /* Override default */
+    }
+    .slide[data-shape="diamond"] .icon-part::before {
+      width: 150%;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(45deg);
+      animation: pulseLine 3.5s ease-in-out infinite;
+    }
+
+    .slide[data-shape="line"] .icon-part {
+      clip-path: polygon(0% 45%, 100% 45%, 100% 55%, 0% 55%);
+      border-radius: 0; /* Override default */
+    }
+    .slide[data-shape="line"] .icon-part::before {
+      width: 150%;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(90deg);
+      animation: pulseLine 2s ease-in-out infinite;
+    }
+
+    .slide[data-shape="cross"] .icon-part {
+      clip-path: polygon(45% 0%, 55% 0%, 55% 45%, 100% 45%, 100% 55%, 55% 55%, 55% 100%, 45% 100%, 45% 55%, 0% 55%, 0% 45%, 45% 45%);
+      border-radius: 0; /* Override default */
+    }
+    .slide[data-shape="cross"] .icon-part::before {
+      width: 150%;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(0deg);
+      animation: pulseLine 3s ease-in-out infinite;
+    }
+
+    .slide[data-shape="spiral"] .icon-part {
+      clip-path: circle(50% at 50% 50%);
+    }
+    .slide[data-shape="spiral"] .icon-part::before {
+      width: 150%;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(0deg);
+      animation: spiralLine 4s linear infinite;
+    }
+
+    .slide[data-shape="wave"] .icon-part {
+      clip-path: polygon(0% 50%, 10% 40%, 20% 50%, 30% 40%, 40% 50%, 50% 40%, 60% 50%, 70% 40%, 80% 50%, 90% 40%, 100% 50%, 90% 60%, 80% 50%, 70% 60%, 60% 50%, 50% 60%, 40% 50%, 30% 60%, 20% 50%, 10% 60%, 0% 50%);
+      border-radius: 0; /* Override default */
+    }
+    .slide[data-shape="wave"] .icon-part::before {
+      width: 150%;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(0deg);
+      animation: waveLine 3s ease-in-out infinite;
+    }
+
+    .slide[data-shape="grid"] .icon-part {
+      clip-path: polygon(0% 0%, 0% 100%, 10% 100%, 10% 10%, 90% 10%, 90% 90%, 10% 90%, 10% 100%, 100% 100%, 100% 0%);
+      border-radius: 0; /* Override default */
+    }
+    .slide[data-shape="grid"] .icon-part::before {
+      width: 150%;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(45deg);
+      animation: pulseLine 4s ease-in-out infinite;
+    }
+
+    .slide[data-shape="bubbles"] .icon-part {
+      clip-path: circle(50% at 50% 50%);
+    }
+    .slide[data-shape="bubbles"] .icon-part::before {
+      width: 150%;
+      height: 2px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(0deg);
+      animation: pulseLine 3s ease-in-out infinite;
+    }
+
+    /* Motion line animations */
+    @keyframes rotateLine {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes pulseLine {
+      0%, 100% { opacity: 0.3; width: 150%; }
+      50% { opacity: 1; width: 200%; }
+    }
+
+    @keyframes spiralLine {
+      0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.5); opacity: 0; }
+      50% { transform: translate(-50%, -50%) rotate(180deg) scale(1); opacity: 1; }
+      100% { opacity: 1; transform: translate(-50%, -50%) rotate(360deg) scale(1); } /* Keep visible at the end */
+    }
+
+    @keyframes waveLine {
+      0%, 100% { transform: translate(-50%, -50%) rotate(0deg) translateY(0); }
+      25% { transform: translate(-50%, -50%) rotate(0deg) translateY(-10px); }
+      50% { transform: translate(-50%, -50%) rotate(0deg) translateY(0); }
+      75% { transform: translate(-50%, -50%) rotate(0deg) translateY(10px); }
+    }
+
+    /* Icon transition animations */
+    /* These are applied via JS by adding/removing classes */
+    .icon-part.construct {
+      animation: construct 0.5s ease-out forwards;
+    }
+
+    .icon-part.deconstruct {
+      animation: deconstruct 0.5s ease-in forwards;
+    }
+
+    @keyframes construct {
+      0% { opacity: 0; transform: scale(0.5) rotate(0deg); }
+      100% { opacity: 1; transform: scale(1) rotate(360deg); }
+    }
+
+    @keyframes deconstruct {
+      0% { opacity: 1; transform: scale(1) rotate(0deg); }
+      100% { opacity: 0; transform: scale(0.5) rotate(360deg); }
+    }
+
+    /* Modal styles */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80%;
+      height: 80%;
+      background: rgba(0, 0, 0, 0.9);
+      border: 2px solid var(--icon-color);
+      border-radius: 10px;
+      z-index: 1000;
+      overflow: hidden;
+      padding: 20px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      animation: modalFadeIn 0.3s ease-out;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: transparent;
+      border: none;
+      color: var(--icon-color);
+      font-size: 1.5em;
+      cursor: pointer;
+      transition: transform 0.2s;
+      z-index: 1001;
+    }
+
+    .modal-close:hover,
+    .modal-close:focus {
+      transform: scale(1.2);
+      outline: none;
+    }
+
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: translate(-50%, -60%); }
+      to { opacity: 1; transform: translate(-50%, -50%); }
+    }
+
+    /* Iframe styles for Gemini content */
+    .gemini-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: transparent;
+    }
+
+    /* Loading spinner */
+    .modal-loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 40px;
+      border: 4px solid var(--icon-color);
+      border-top: 4px solid transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      z-index: 1000;
+    }
+
+    @keyframes spin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* Navigation controls */
+    .style-switcher {
+      position:absolute;
+      top:10px;
+      left:50%;
+      transform:translateX(-50%);
+      display:flex;
+      gap:8px;
+      z-index:11;
+    }
+
+    .style-switcher button {
+      background: transparent;
+      border: none;
+      color: var(--icon-color);
+      font-size: 1.5em;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      opacity: 0.7;
+      padding: 8px;
+      border-radius: 50%;
+    }
+
+    .style-switcher button:hover,
+    .style-switcher button:focus {
+      opacity: 1;
+      transform: scale(1.1);
+      outline: none;
+    }
+
+    .style-switcher button.active {
+      opacity: 1;
+      text-shadow: 0 0 5px var(--icon-color);
+    }
+
+    .mobile-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      z-index: 100;
+      opacity: 0.7;
+    }
+
+    .mobile-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.5);
+      border: 2px solid var(--icon-color);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5em;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .mobile-btn:active {
+      transform: scale(0.9);
+      background: rgba(0,0,0,0.7);
+    }
+
+    /* Responsive styles */
+    @media (max-width: 768px) {
+      :root {
+        --transition-duration: 0.6s;
+      }
+
+      .overlay h1 { font-size: 1.8em; }
+      .overlay h2 { font-size: 1.2em; }
+      .icon-container { width: 100px; height: 100px; }
+      .modal { padding: 15px; }
+    }
+
+    @media (max-width: 480px) {
+      :root {
+        --transition-duration: 0.5s;
+      }
+
+      .overlay h1 { font-size: 1.5em; }
+      .overlay h2 { font-size: 1em; }
+      .icon-container { width: 80px; height: 80px; }
+      .mobile-controls { gap: 30px; }
+      .mobile-btn { width: 40px; height: 40px; font-size: 1.2em; }
+      .modal { padding: 10px; }
+    }
+
+    @media (hover: hover) {
+      .mobile-controls { display: none; }
+    }
+
+    /* Style themes */
+    body.style-clean {
+      --mode-bg: #f0f0f0;
+      --icon-color: #3f51b5;
+      --overlay-text: #333;
+      --overlay-font: Arial, sans-serif;
+    }
+
+    body.style-clean .slide {
+        background: rgba(255,255,255,0.5);
+        filter: blur(0); /* No blur in clean style */
+    }
+
+    body.style-clean .slide.active {
+        filter: blur(0);
+    }
+
+    body.style-clean .slide canvas {
+        filter: blur(0); /* No blur on canvas in clean style */
+    }
+
+    body.style-clean .slide.active canvas {
+        filter: blur(0);
+    }
+
+    body.style-clean .overlay h1,
+    body.style-clean .overlay h2 {
+        text-shadow: none;
+    }
+
+    body.style-clean .icon-part::before {
+        background: rgba(0,0,0,0.1);
+    }
+
+     body.style-clean .style-switcher button {
+        color: #333;
+     }
+
+    body.style-comic {
+      --mode-bg: #fff59d;
+      --icon-color: #ff6e40;
+      --overlay-text: #3e2723;
+      --overlay-font: "VT323", monospace; /* Keep VT323 for comic */
+      border: 5px dashed var(--icon-color); /* Comic border */
+    }
+
+    body.style-comic .slide {
+        background: rgba(255,255,255,0.8);
+        border: 3px solid var(--icon-color);
+        filter: none; /* No blur in comic */
+    }
+
+    body.style-comic .slide.active {
+        filter: none;
+    }
+
+    body.style-comic .slide canvas {
+        filter: none; /* No blur on canvas in comic */
+    }
+
+    body.style-comic .slide.active canvas {
+        filter: none;
+    }
+
+    body.style-comic .overlay h1,
+    body.style-comic .overlay h2 {
+        text-shadow: 2px 2px 0px var(--mode-bg); /* Comic text shadow */
+        -webkit-text-stroke: 1px var(--icon-color); /* Comic stroke */
+        text-stroke: 1px var(--icon-color);
+    }
+
+    body.style-comic .icon-part::before {
+        background: rgba(0,0,0,0.2);
+    }
+
+     body.style-comic .style-switcher button {
+        color: #3e2723;
+     }
+
+     body.style-comic .modal {
+         border: 5px dashed var(--icon-color);
+     }
+
+     body.style-comic .modal-close {
+         color: #3e2723;
+     }
+
+     body.style-comic .modal-loading {
+        border-color: #3e2723;
+        border-top-color: transparent;
+     }
+
+
+  </style>
+</head>
+<body>
+  <div class="style-switcher">
+    <button data-style="cyber" class="active" aria-label="סגנון סייבר">⚙️</button>
+    <button data-style="clean" aria-label="סגנון נקי">☀️</button>
+    <button data-style="comic" aria-label="סגנון קומיקס">✨</button>
+  </div>
+
+  <div class="scene">
+    <div class="slides">
+      <section class="slide active" data-shape="circle" data-particle="circle" aria-label="Oren Gamchi - מעצב דיגיטלי">
+        <canvas></canvas>
+        <div class="overlay"><h1>Oren_Gamchi</h1><h2>digital designer</h2></div>
+        <div class="icon-container">
+          <div class="icon-construction">
+            <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-circle" role="dialog" aria-labelledby="modal-circle-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-circle-title" style="display: none;">Oren Gamchi - Digital Designer</h2>
+            <div class="modal-loading"></div>
+            <iframe class="gemini-iframe" src="https://raw.githack.com/orengamchi/main/refs/heads/main/gemini_wow.html" title="Gemini Particle Animation" aria-label="אנימציית חלקיקות דינמית"></iframe>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="square" data-particle="square" aria-label="CLAYtronixX - AIsland">
+        <canvas></canvas>
+        <div class="overlay"><h1>CLAYtronixX</h1><h2>AIsland</h2></div>
+        <div class="icon-container">
+          <div class="icon-construction">
+            <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-square" role="dialog" aria-labelledby="modal-square-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-square-title">CLAYtronixX - AIsland</h2>
+            <p>Content for CLAYtronixX - AIsland modal.</p>
+            <div id="links-square"></div>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="triangle" data-particle="triangle" aria-label="TRAIN_dev - מעצב דיגיטלי">
+        <canvas></canvas>
+        <div class="overlay"><h1>TRAIN_dev</h1><h2>Digital Designer</h2></div>
+        <div class="icon-container">
+          <div class="icon-construction">
+            <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-triangle" role="dialog" aria-labelledby="modal-triangle-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-triangle-title">TRAIN_dev - Digital Designer</h2>
+             <p>Content for TRAIN_dev - Digital Designer modal.</p>
+            <div id="links-triangle"></div>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="hexagon" data-particle="hexagon" aria-label="דוגמנות תלת-ממד - אמנות פוליגונלית">
+        <canvas></canvas>
+        <div class="overlay"><h1>3D Modeling</h1><h2>Polygonal Art</h2></div>
+        <div class="icon-container">
+          <div class="icon-construction">
+            <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-hexagon" role="dialog" aria-labelledby="modal-hexagon-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-hexagon-title">3D Modeling - Polygonal Art</h2>
+             <p>Content for 3D Modeling - Polygonal Art modal.</p>
+            <div id="links-hexagon"></div>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="star" data-particle="star" aria-label="עיצוב ממשק משתמש - פתרונות יצירתיים">
+        <canvas></canvas>
+        <div class="overlay"><h1>UI/UX Design</h1><h2>Creative Solutions</h2></div>
+        <div class="icon-container">
+          <div class="icon-construction">
+            <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-star" role="dialog" aria-labelledby="modal-star-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-star-title">UI/UX Design - Creative Solutions</h2>
+             <p>Content for UI/UX Design - Creative Solutions modal.</p>
+            <div id="links-star"></div>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="diamond" data-particle="diamond" aria-label="גרפיקה בתנועה - ויזואליות דינמית">
+        <canvas></canvas>
+        <div class="overlay"><h1>Motion Graphics</h1><h2>Dynamic Visuals</h2></div>
+        <div class="icon-container">
+          <div class="icon-construction">
+            <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-diamond" role="dialog" aria-labelledby="modal-diamond-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-diamond-title">Motion Graphics - Dynamic Visuals</h2>
+             <p>Content for Motion Graphics - Dynamic Visuals modal.</p>
+            <div id="links-diamond"></div>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="line" data-particle="line" aria-label="פיתוח אתרים - חוויות אינטראקטיביות">
+        <canvas></canvas>
+        <div class="overlay"><h1>Web Development</h1><h2>Interactive Experiences</h2></div>
+        <div class="icon-container">
+          <div class="icon-construction">
+            <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-line" role="dialog" aria-labelledby="modal-line-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-line-title">Web Development - Interactive Experiences</h2>
+             <p>Content for Web Development - Interactive Experiences modal.</p>
+            <div id="links-line"></div>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="cross" data-particle="cross" aria-label="זהות מותג - מערכות ויזואליות">
+        <canvas></canvas>
+        <div class="overlay"><h1>Brand Identity</h1><h2>Visual Systems</h2></div>
+        <div class="icon-container">
+          <div class="icon-construction">
+            <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-cross" role="dialog" aria-labelledby="modal-cross-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-cross-title">Brand Identity - Visual Systems</h2>
+             <p>Content for Brand Identity - Visual Systems modal.</p>
+            <div id="links-cross"></div>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="spiral" data-particle="spiral" aria-label="קידוד יצירתי - אמנות גנרטיבית">
+        <canvas></canvas>
+        <div class="overlay"><h1>Creative Coding</h1><h2>Generative Art</h2></div>
+        <div class="icon-container">
+          <div class="icon-construction">
+            <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-spiral" role="dialog" aria-labelledby="modal-spiral-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-spiral-title">Creative Coding - Generative Art</h2>
+             <p>Content for Creative Coding - Generative Art modal.</p>
+            <div id="links-spiral"></div>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="wave" data-particle="wave" aria-label="טיפוגרפיה - אמנות אותיות">
+        <canvas></canvas>
+        <div class="overlay"><h1>Typography</h1><h2>Letterform Art</h2></div>
+        <div class="icon-container">
+          <div class="icon-construction">
+            <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-wave" role="dialog" aria-labelledby="modal-wave-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-wave-title">Typography - Letterform Art</h2>
+             <p>Content for Typography - Letterform Art modal.</p>
+            <div id="links-wave"></div>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="grid" data-particle="grid" aria-label="אמנות דיגיטלית - פיקסל מושלם">
+        <canvas></canvas>
+        <div class="overlay"><h1>Digital Art</h1><h2>Pixel Perfect</h2></div>
+        <div class="icon-container">
+          <div class="icon-construction">
+            <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-grid" role="dialog" aria-labelledby="modal-grid-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-grid-title">Digital Art - Pixel Perfect</h2>
+             <p>Content for Digital Art - Pixel Perfect modal.</p>
+            <div id="links-grid"></div>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="bubbles" data-particle="bubbles" aria-label="אילוסטרציה - סיפור ויזואלי">
+        <canvas></canvas>
+        <div class="overlay"><h1>Illustration</h1><h2>Visual Storytelling</h2></div>
+        <div class="icon-container">
+          <div class="icon-construction">
+            <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-bubbles" role="dialog" aria-labelledby="modal-bubbles-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-bubbles-title">Illustration - Visual Storytelling</h2>
+             <p>Content for Illustration - Visual Storytelling modal.</p>
+            <div id="links-bubbles"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="mobile-controls">
+    <div class="mobile-btn" id="prev-btn" aria-label="שקופית קודמת">↑</div>
+    <div class="mobile-btn" id="next-btn" aria-label="שקופית הבאה">↓</div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const slides = [...document.querySelectorAll('.slide')];
+      const container = document.querySelector('.slides');
+      const prevBtn = document.getElementById('prev-btn');
+      const nextBtn = document.getElementById('next-btn');
+      const styleSwitcher = document.querySelector('.style-switcher');
+      const styleButtons = styleSwitcher.querySelectorAll('button');
+
+      let current = 0;
+      let wheelDelta = 0;
+      // Calculate depth based on viewport height, clamped between 600 and 1000
+      let depth = Math.min(Math.max(window.innerHeight * 0.8, 600), 1000);
+      let systems = []; // Array to hold particle system instances
+      let lastTap = 0;
+      let isAnimating = false; // Flag to prevent rapid animation triggering
+      const animationDuration = parseFloat(getComputedStyle(container).transitionDuration) * 1000; // Get transition duration from CSS
+      let lastWheelTime = 0;
+      const wheelThrottle = 500; // Milliseconds to throttle wheel events
+      let lastIconTap = 0;
+      const iconTapThrottle = 300; // Milliseconds to throttle icon taps
+
+      // Easing function (from your CSS)
+      function easeOutQuart(t) {
+        return 1 - Math.pow(1 - t, 4);
+      }
+
+      // Particle System Class (Basic Implementation)
+      class ParticleSystem {
+        constructor(canvas, shape) {
+          this.canvas = canvas;
+          this.ctx = canvas.getContext('2d');
+          this.shape = shape;
+          this.particles = [];
+          this.width = canvas.width;
+          this.height = canvas.height;
+          this.isAnimating = false; // Flag to control animation loop
+
+          this.initParticles();
+          this.resizeCanvas(); // Set initial canvas size
+          window.addEventListener('resize', this.resizeCanvas.bind(this));
+        }
+
+        // Initialize particles based on shape
+        initParticles() {
+          this.particles = [];
+          const numParticles = Math.min(this.width * this.height / 10000, 150); // Adjust particle count based on size
+          for (let i = 0; i < numParticles; i++) {
+            this.particles.push(this.createParticle());
+          }
+        }
+
+        // Create a single particle
+        createParticle() {
+          let x, y;
+          // Distribute particles differently based on shape (basic example)
+          switch (this.shape) {
+            case 'circle':
+              const angle = Math.random() * Math.PI * 2;
+              const radius = Math.random() * Math.min(this.width, this.height) / 3;
+              x = this.width / 2 + Math.cos(angle) * radius;
+              y = this.height / 2 + Math.sin(angle) * radius;
+              break;
+            case 'square':
+              x = Math.random() * this.width;
+              y = Math.random() * this.height;
+              break;
+            case 'triangle':
+              // Simple triangle distribution
+              x = Math.random() * this.width;
+              y = Math.random() * this.height;
+              if (y > this.height - (x * this.height / this.width)) {
+                  y = this.height - (x * this.height / this.width) * Math.random();
+              }
+              break;
+             case 'hexagon':
+                // Simple random distribution for hexagon
+                x = Math.random() * this.width;
+                y = Math.random() * this.height;
+                break;
+             case 'star':
+                // Simple random distribution for star
+                x = Math.random() * this.width;
+                y = Math.random() * this.height;
+                break;
+             case 'diamond':
+                // Simple random distribution for diamond
+                x = Math.random() * this.width;
+                y = Math.random() * this.height;
+                break;
+             case 'line':
+                // Particles along a line
+                x = Math.random() * this.width;
+                y = this.height / 2 + (Math.random() - 0.5) * 20; // Thin horizontal band
+                break;
+             case 'cross':
+                // Particles along a cross shape
+                if (Math.random() > 0.5) { // Horizontal part
+                    x = Math.random() * this.width;
+                    y = this.height / 2 + (Math.random() - 0.5) * 20;
+                } else { // Vertical part
+                    x = this.width / 2 + (Math.random() - 0.5) * 20;
+                    y = Math.random() * this.height;
+                }
+                break;
+             case 'spiral':
+                // Particles in a spiral pattern (simplified)
+                const spiralRadius = Math.random() * Math.min(this.width, this.height) / 2;
+                const spiralAngle = Math.random() * Math.PI * 10; // Multiple turns
+                x = this.width / 2 + Math.cos(spiralAngle) * spiralRadius;
+                y = this.height / 2 + Math.sin(spiralAngle) * spiralRadius;
+                break;
+             case 'wave':
+                // Particles following a wave pattern (simplified)
+                x = Math.random() * this.width;
+                y = this.height / 2 + Math.sin(x / 50) * 30 + (Math.random() - 0.5) * 20;
+                break;
+             case 'grid':
+                // Particles on a grid (simplified)
+                const gridSize = 40;
+                x = Math.floor(Math.random() * (this.width / gridSize)) * gridSize + gridSize / 2;
+                y = Math.floor(Math.random() * (this.height / gridSize)) * gridSize + gridSize / 2;
+                break;
+             case 'bubbles':
+                 // Particles randomly distributed like bubbles
+                 x = Math.random() * this.width;
+                 y = Math.random() * this.height;
+                 break;
+            default: // Default to random distribution
+              x = Math.random() * this.width;
+              y = Math.random() * this.height;
+          }
+
+          return {
+            x: x,
+            y: y,
+            size: Math.random() * 2 + 1, // Particle size
+            speedX: (Math.random() - 0.5) * 0.5, // Random horizontal speed
+            speedY: (Math.random() - 0.5) * 0.5, // Random vertical speed
+            opacity: Math.random() * 0.5 + 0.2, // Random initial opacity
+            color: getComputedStyle(document.body).getPropertyValue('--icon-color') || '#e94560' // Use CSS variable for color
+          };
+        }
+
+        // Update particle position and properties
+        updateParticle(particle) {
+          particle.x += particle.speedX;
+          particle.y += particle.speedY;
+
+          // Wrap particles around edges
+          if (particle.x > this.width) particle.x = 0;
+          if (particle.x < 0) particle.x = this.width;
+          if (particle.y > this.height) particle.y = 0;
+          if (particle.y < 0) particle.y = this.height;
+
+          // Optionally add some random movement or pulsing
+          particle.opacity = Math.sin(Date.now() * 0.001 + particle.x + particle.y) * 0.3 + 0.5;
+        }
+
+        // Draw a single particle
+        drawParticle(particle) {
+          this.ctx.fillStyle = `rgba(${parseInt(particle.color.slice(1, 3), 16)}, ${parseInt(particle.color.slice(3, 5), 16)}, ${parseInt(particle.color.slice(5, 7), 16)}, ${particle.opacity})`;
+          this.ctx.beginPath();
+          this.ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
+
+        // Animation loop
+        animate() {
+          if (!this.isAnimating) return; // Stop if animation is not active
+
+          this.ctx.clearRect(0, 0, this.width, this.height); // Clear canvas
+          this.particles.forEach(particle => {
+            this.updateParticle(particle);
+            this.drawParticle(particle);
+          });
+
+          requestAnimationFrame(this.animate.bind(this)); // Request next frame
+        }
+
+        // Start animation
+        start() {
+            this.isAnimating = true;
+            this.animate();
+        }
+
+        // Stop animation
+        stop() {
+            this.isAnimating = false;
+        }
+
+        // Resize canvas and re-initialize particles
+        resizeCanvas() {
+          this.width = this.canvas.width = this.canvas.offsetWidth;
+          this.height = this.canvas.height = this.canvas.offsetHeight;
+          this.initParticles(); // Re-initialize particles on resize
+        }
+      }
+
+      // Initialize particle systems for each slide
+      slides.forEach(slide => {
+        const canvas = slide.querySelector('canvas');
+        const shape = slide.dataset.particle || 'circle'; // Default to circle if no data-particle
+        const system = new ParticleSystem(canvas, shape);
+        systems.push(system);
+      });
+
+      // Function to update slide positions and active state
+      function updateSlides() {
+        const total = slides.length;
+        slides.forEach((slide, index) => {
+          const offset = index - current;
+          const angle = offset * 10; // Angle difference between slides
+          const translateY = offset * 0; // No vertical translation in this setup
+          const translateZ = -Math.abs(offset) * depth; // Z translation based on distance from active slide
+
+          // Apply 3D transform
+          slide.style.transform = `translateY(${translateY}px) translateZ(${translateZ}px) rotateY(${angle}deg)`;
+
+          // Set active class
+          if (index === current) {
+            slide.classList.add('active');
+            systems[index].start(); // Start particle animation for active slide
+          } else {
+            slide.classList.remove('active');
+            systems[index].stop(); // Stop particle animation for inactive slides
+          }
+        });
+      }
+
+      // Function to handle slide change
+      function changeSlide(direction) {
+        if (isAnimating) return; // Prevent changing slide while animating
+
+        const total = slides.length;
+        const prev = current;
+        current = (current + direction + total) % total;
+
+        isAnimating = true; // Set animation flag
+        updateSlides(); // Update slide positions and active state
+
+        // Animate icon deconstruction on the previous slide and construction on the new slide
+        animateIcons(slides[prev], 'deconstruct');
+        animateIcons(slides[current], 'construct');
+
+        // Remove animation flag after transition duration
+        setTimeout(() => {
+          isAnimating = false;
+        }, animationDuration);
+      }
+
+      // Function to animate icons
+      function animateIcons(slide, animationType) {
+          const iconParts = slide.querySelectorAll('.icon-part');
+          iconParts.forEach(part => {
+              // Remove previous animation classes
+              part.classList.remove('construct', 'deconstruct');
+              // Trigger reflow to restart animation
+              void part.offsetWidth;
+              // Add the new animation class
+              part.classList.add(animationType);
+          });
+      }
+
+      // Initial setup: position slides and animate the first icon
+      updateSlides();
+      animateIcons(slides[current], 'construct');
+
+      // Mouse wheel navigation
+      window.addEventListener('wheel', (e) => {
+        const now = Date.now();
+        if (now - lastWheelTime < wheelThrottle) {
+            wheelDelta += e.deltaY;
+            return; // Throttle rapid wheel events
+        }
+
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { // Prioritize vertical scroll
+             if (e.deltaY > 0) {
+                changeSlide(1); // Scroll down, go to next slide
+              } else {
+                changeSlide(-1); // Scroll up, go to previous slide
+              }
+             lastWheelTime = now; // Update last wheel time
+             wheelDelta = 0; // Reset wheel delta
+        } else if (Math.abs(wheelDelta) > 0) { // Handle accumulated delta if horizontal scroll was dominant
+             if (wheelDelta > 0) {
+                changeSlide(1);
+             } else {
+                changeSlide(-1);
+             }
+             lastWheelTime = now;
+             wheelDelta = 0;
+        }
+      }, { passive: false }); // Use passive: false to potentially prevent default scroll
+
+      // Touch navigation (swipe up/down)
+      let touchStartY = 0;
+      window.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          touchStartY = e.touches[0].clientY;
+          lastTap = Date.now(); // Record tap time for double tap check
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchend', (e) => {
+        if (e.changedTouches.length === 1) {
+          const touchEndY = e.changedTouches[0].clientY;
+          const deltaY = touchEndY - touchStartY;
+          const tapDuration = Date.now() - lastTap;
+
+          // Check for swipe
+          if (Math.abs(deltaY) > 50 && tapDuration < 500) { // Minimum swipe distance and duration
+            if (deltaY < 0) {
+              changeSlide(1); // Swipe up, go to next slide
+            } else {
+              changeSlide(-1); // Swipe down, go to previous slide
+            }
+          }
+        }
+      }, { passive: true });
+
+      // Mobile button navigation
+      if (prevBtn && nextBtn) {
+          prevBtn.addEventListener('click', () => changeSlide(-1));
+          nextBtn.addEventListener('click', () => changeSlide(1));
+      }
+
+
+      // Icon click to open modal
+      slides.forEach(slide => {
+        const iconContainer = slide.querySelector('.icon-container');
+        const modal = slide.querySelector('.modal');
+        const modalCloseButton = slide.querySelector('.modal-close');
+        const iframe = modal ? modal.querySelector('.gemini-iframe') : null;
+        const loadingSpinner = modal ? modal.querySelector('.modal-loading') : null;
+
+        if (iconContainer && modal) {
+          iconContainer.addEventListener('click', () => {
+            const now = Date.now();
+            if (now - lastIconTap < iconTapThrottle) {
+                return; // Throttle rapid icon taps
+            }
+            lastIconTap = now;
+
+            // Only open modal for the active slide
+            if (slide.classList.contains('active')) {
+              modal.classList.add('active');
+              document.body.style.overflow = 'hidden'; // Prevent background scroll
+
+              // Handle iframe loading for the first slide
+              if (iframe && loadingSpinner) {
+                  loadingSpinner.style.display = 'block'; // Show spinner
+                  iframe.style.display = 'none'; // Hide iframe initially
+
+                  // Listen for iframe load event
+                  iframe.onload = () => {
+                      loadingSpinner.style.display = 'none'; // Hide spinner
+                      iframe.style.display = 'block'; // Show iframe
+                  };
+                  // Set iframe src (already set in HTML, but this ensures it loads)
+                  iframe.src = iframe.src;
+              }
+            }
+          });
+
+          // Close modal
+          modalCloseButton.addEventListener('click', () => {
+            modal.classList.remove('active');
+            document.body.style.overflow = ''; // Restore background scroll
+             // Stop iframe content if it's the Gemini animation
+             if (iframe && iframe.src.includes('gemini_wow.html')) {
+                 iframe.contentWindow.postMessage('stopAnimation', '*');
+             }
+          });
+
+          // Close modal on escape key
+          document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('active')) {
+              modal.classList.remove('active');
+              document.body.style.overflow = '';
+               // Stop iframe content if it's the Gemini animation
+              if (iframe && iframe.src.includes('gemini_wow.html')) {
+                  iframe.contentWindow.postMessage('stopAnimation', '*');
+              }
+            }
+          });
+        }
+      });
+
+      // Style switcher functionality
+      styleButtons.forEach(button => {
+          button.addEventListener('click', () => {
+              const style = button.dataset.style;
+              document.body.className = ''; // Clear existing style classes
+              document.body.classList.add(`style-${style}`);
+
+              // Update active button state
+              styleButtons.forEach(btn => btn.classList.remove('active'));
+              button.classList.add('active');
+
+              // Update particle colors based on new style
+              systems.forEach(system => {
+                  system.particles.forEach(p => {
+                      p.color = getComputedStyle(document.body).getPropertyValue('--icon-color');
+                  });
+              });
+          });
+      });
+
+
+      // Handle window resize
+      window.addEventListener('resize', () => {
+        // Recalculate depth on resize
+        depth = Math.min(Math.max(window.innerHeight * 0.8, 600), 1000);
+        updateSlides(); // Update slide positions
+         // Particle systems handle their own resizing via the resizeCanvas method
+      });
+
+       // Add keyboard navigation (arrow keys)
+        document.addEventListener('keydown', (e) => {
+            if (!document.querySelector('.modal.active')) { // Only navigate if no modal is open
+                if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                    changeSlide(1);
+                } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                    changeSlide(-1);
+                }
+            }
+        });
+
+        // Initial icon animation trigger after page load
+         setTimeout(() => {
+             animateIcons(slides[current], 'construct');
+         }, 100); // Small delay to ensure elements are rendered
+
+    });
+  </script>
+</body>
+</html>

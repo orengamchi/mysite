@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>פיזור אינטראקטיבי מתקדם עם כל הצורות</title>
+  <style>
+    html, body { margin:0; padding:0; overflow:hidden; background:white; transition: background 0.5s; }
+    body.dark { background:#111; }
+    body.bw canvas { filter: grayscale(1); }
+    canvas { position:absolute; top:0; left:0; width:100vw; height:100vh; }
+    #bg        { z-index:0; }
+    #bin       { z-index:1; }
+    #codeCanvas{ z-index:2; }
+    #fg        { z-index:3; }
+    #controls {
+      position:absolute; bottom:10px; right:10px; z-index:4;
+      background:rgba(255,255,255,0.9); padding:10px;
+      border-radius:10px; font-family:sans-serif; font-size:14px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      width: 250px;
+    }
+    body.dark #controls { background:rgba(30,30,30,0.8); color:#ddd; }
+    .toggle-btn {
+      position:absolute; top:10px; width:40px; height:40px; z-index:5;
+      font-size:20px; line-height:36px; text-align:center;
+      border-radius:50%; border:2px solid; background:rgba(255,255,255,0.8);
+      cursor:pointer; box-shadow:0 0 8px rgba(0,0,0,0.3); transition:all 0.3s;
+    }
+    body.dark .toggle-btn { background:rgba(30,30,30,0.8); }
+    #toggleDark { left:10px; color:#ffa500; border-color:#ffa500; }
+    body.dark #toggleDark { color:#fff176; border-color:#fff176; }
+    #toggleBW { left:60px; color:#000; border-color:#000; }
+    body.dark #toggleBW { color:#fff; border-color:#fff; }
+    #layoutBtn { left:110px; color:#08f; border-color:#08f; }
+    #isolateBtn { left:160px; color:#f08; border-color:#f08; }
+    #addElementsBtn { left:210px; color:#4CAF50; border-color:#4CAF50; }
+    #gridModeBtn { left:260px; color:#9C27B0; border-color:#9C27B0; }
+    #sizeBtn { left:310px; color:#FF9800; border-color:#FF9800; font-size:16px; }
+    .toggle-btn.active { background:rgba(200,200,255,0.6); }
+    body.dark .toggle-btn.active { background:rgba(50,50,80,0.6); }
+    #layoutMenu, #addElementsMenu, #sizeMenu {
+      position:absolute; top:60px; z-index:6;
+      background:rgba(255,255,255,0.95); border:1px solid #888;
+      padding:5px; display:none; border-radius:5px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.2);
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    body.dark #layoutMenu, body.dark #addElementsMenu, body.dark #sizeMenu { 
+      background:rgba(30,30,30,0.95); border-color:#555;
+    }
+    #layoutMenu { left:110px; width: 180px; }
+    #addElementsMenu { left:210px; width:150px; }
+    #sizeMenu { left:310px; width: 120px; }
+    #layoutMenu button, #addElementsMenu button, #sizeMenu button {
+      display:block; width:100%; margin:2px 0; font-size:13px;
+      background:#f5f5f5; border:1px solid #ddd; border-radius:3px;
+      padding:5px 8px; cursor:pointer; text-align:right;
+      white-space: nowrap;
+    }
+    body.dark #layoutMenu button, 
+    body.dark #addElementsMenu button,
+    body.dark #sizeMenu button { 
+      background:#333; border-color:#555; color:#eee;
+    }
+    #layoutMenu button:hover, 
+    #addElementsMenu button:hover,
+    #sizeMenu button:hover {
+      background:#e0e0e0;
+    }
+    body.dark #layoutMenu button:hover, 
+    body.dark #addElementsMenu button:hover,
+    body.dark #sizeMenu button:hover {
+      background:#444;
+    }
+    #controls label { display:block; margin:5px 0; }
+    #controls input { width:100px; vertical-align:middle; }
+    .tooltip {
+      position:absolute; bottom:60px; right:10px; z-index:7;
+      background:rgba(0,0,0,0.7); color:white; padding:8px 12px;
+      border-radius:5px; font-size:12px; display:none;
+      max-width:200px; pointer-events:none;
+    }
+    .grid-point {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: rgba(255,0,0,0.5);
+      transform: translate(-4px, -4px);
+      z-index: 8;
+      pointer-events: none;
+      display: none;
+    }
+    body.dark .grid-point {
+      background-color: rgba(255,100,100,0.7);
+    }
+    .category-title {
+      font-weight: bold;
+      padding: 5px;
+      background: rgba(0,0,0,0.1);
+      margin: 5px -5px;
+      text-align: center;
+    }
+    body.dark .category-title {
+      background: rgba(255,255,255,0.1);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="bg"></canvas>
+  <canvas id="bin"></canvas>
+  <canvas id="codeCanvas"></canvas>
+  <canvas id="fg"></canvas>
+  <div class="grid-point" id="gridPoint"></div>
+
+  <div id="controls">
+    <label>כאוס: <input type="range" id="chaos" min="0" max="1" step="0.01" value="0.1"></label>
+    <label>צפיפות: <input type="range" id="density" min="1" max="10" step="1" value="3"></label>
+    <label>גודל בסיסי: <input type="range" id="baseSize" min="3" max="20" step="1" value="8"></label>
+    <label>מרווח גריד: <input type="range" id="gridSpacing" min="20" max="150" step="10" value="60"></label>
+    <label>קנה מידה: <input type="range" id="scaleFactor" min="50" max="200" step="10" value="150"></label>
+  </div>
+  
+  <button id="toggleDark" class="toggle-btn" title="מצב לילה">☀</button>
+  <button id="toggleBW" class="toggle-btn" title="שחור-לבן">B/W</button>
+  <button id="layoutBtn" class="toggle-btn" title="סידורים">≡</button>
+  <button id="isolateBtn" class="toggle-btn" title="בידוד">★</button>
+  <button id="addElementsBtn" class="toggle-btn" title="הוספת רכיבים">+</button>
+  <button id="gridModeBtn" class="toggle-btn" title="מצב גריד">#</button>
+  <button id="sizeBtn" class="toggle-btn" title="גודל רכיבים">S</button>
+  
+  <div id="layoutMenu">
+    <div class="category-title">צורות בסיסיות</div>
+    <button data-layout="0">רשת רגילה</button>
+    <button data-layout="1">רשת אקראית</button>
+    <button data-layout="2">ספירלה</button>
+    <button data-layout="3">קרניים</button>
+    <button data-layout="4">אלכסונים</button>
+    <button data-layout="5">שחמט</button>
+    <button data-layout="6">משושים</button>
+    <button data-layout="7">מעגל</button>
+    
+    <div class="category-title">צורות גיאומטריות</div>
+    <button data-layout="8">לב</button>
+    <button data-layout="9">גלים</button>
+    <button data-layout="10">פרקטל</button>
+    <button data-layout="11">כוכב</button>
+    <button data-layout="12">לולאה</button>
+    <button data-layout="13">שבב</button>
+    <button data-layout="14">עיגולים קונצנטריים</button>
+    <button data-layout="15">מעוינים</button>
+    <button data-layout="16">קוביה</button>
+    <button data-layout="17">ריבוע</button>
+    <button data-layout="18">קונוס</button>
+    <button data-layout="19">צילינדר</button>
+    <button data-layout="20">דונאט</button>
+    <button data-layout="21">מדורג</button>
+    <button data-layout="22">משובץ</button>
+    
+    <div class="category-title">צורות מיוחדות</div>
+    <button data-layout="23">מסולסל</button>
+    <button data-layout="24">נקי</button>
+    <button data-layout="25">הקפי</button>
+    <button data-layout="26">קלידוסקופי</button>
+    <button data-layout="27">פירמידה</button>
+    <button data-layout="28">מדוזה</button>
+    <button data-layout="29">יהלום</button>
+    <button data-layout="30">שעון</button>
+    <button data-layout="31">כדור</button>
+    <button data-layout="32">קפיץ</button>
+  </div>
+  
+  <div id="addElementsMenu">
+    <button data-element="spring">הוסף קפיץ</button>
+    <button data-element="led">הוסף נורית</button>
+    <button data-element="wire">הוסף קשר</button>
+    <button data-element="current">הוסף זרם</button>
+    <button data-element="particle">הוסף חלקיק</button>
+    <button data-element="cluster">הוסף צביר</button>
+    <button data-element="gear">הוסף גלגל</button>
+  </div>
+  
+  <div id="sizeMenu">
+    <button data-size="small">קטן</button>
+    <button data-size="medium">בינוני</button>
+    <button data-size="large">גדול</button>
+    <button data-size="random">אקראי</button>
+  </div>
+  
+  <div class="tooltip" id="tooltip"></div>
+
+<script>
+// הגדרת קנבסים והקשר ציור
+const bg = document.getElementById("bg"),
+      binCanvas = document.getElementById("bin"),
+      codeCanvas = document.getElementById("codeCanvas"),
+      fg = document.getElementById("fg"),
+      ctxBg = bg.getContext("2d"),
+      ctxBin = binCanvas.getContext("2d"),
+      ctxCode = codeCanvas.getContext("2d"),
+      ctx = fg.getContext("2d"),
+      gridPoint = document.getElementById("gridPoint");
+
+// הגדרת מידות
+const w = bg.width = binCanvas.width = codeCanvas.width = fg.width = innerWidth;
+const h = bg.height = binCanvas.height = codeCanvas.height = fg.height = innerHeight;
+
+// משתני מערכת
+let chaos = 0.1, density = 3, baseSize = 8, gridSpacing = 60, scaleFactor = 150,
+    pointerX = w/2, pointerY = h/2, pointerActive = false,
+    spreadScale = 75,
+    layoutType = 0, isolateMode = false, addElementMode = null, gridMode = false;
+
+// טקסט הקוד להצגה
+let codeText = document.documentElement.outerHTML, charIndex = 0;
+
+// אירועי בקרה
+document.getElementById("chaos").oninput = e => chaos = +e.target.value;
+document.getElementById("density").oninput = e => { density = +e.target.value; build(); };
+document.getElementById("baseSize").oninput = e => { baseSize = +e.target.value; build(); };
+document.getElementById("gridSpacing").oninput = e => { gridSpacing = +e.target.value; drawGrid(0); };
+document.getElementById("scaleFactor").oninput = e => { scaleFactor = +e.target.value; build(); };
+document.getElementById("toggleDark").onclick = () => document.body.classList.toggle("dark");
+document.getElementById("toggleBW").onclick = () => document.body.classList.toggle("bw");
+
+const layoutBtn = document.getElementById("layoutBtn"),
+      layoutMenu = document.getElementById("layoutMenu"),
+      isolateBtn = document.getElementById("isolateBtn"),
+      addElementsBtn = document.getElementById("addElementsBtn"),
+      addElementsMenu = document.getElementById("addElementsMenu"),
+      gridModeBtn = document.getElementById("gridModeBtn"),
+      sizeBtn = document.getElementById("sizeBtn"),
+      sizeMenu = document.getElementById("sizeMenu"),
+      tooltip = document.getElementById("tooltip");
+
+layoutBtn.onclick = (e) => {
+  layoutMenu.style.display = layoutMenu.style.display === 'block' ? 'none' : 'block';
+  addElementsMenu.style.display = 'none';
+  sizeMenu.style.display = 'none';
+  e.stopPropagation();
+};
+
+addElementsBtn.onclick = (e) => {
+  addElementsMenu.style.display = addElementsMenu.style.display === 'block' ? 'none' : 'block';
+  layoutMenu.style.display = 'none';
+  sizeMenu.style.display = 'none';
+  e.stopPropagation();
+};
+
+sizeBtn.onclick = (e) => {
+  sizeMenu.style.display = sizeMenu.style.display === 'block' ? 'none' : 'block';
+  layoutMenu.style.display = 'none';
+  addElementsMenu.style.display = 'none';
+  e.stopPropagation();
+};
+
+isolateBtn.onclick = () => {
+  isolateMode = !isolateMode;
+  isolateBtn.classList.toggle('active', isolateMode);
+};
+
+gridModeBtn.onclick = () => {
+  gridMode = !gridMode;
+  gridModeBtn.classList.toggle('active', gridMode);
+  gridPoint.style.display = gridMode ? 'block' : 'none';
+  if(gridMode) showTooltip("מצב גריד פעיל - לחץ להוספת רכיבים", 2000);
+};
+
+layoutMenu.querySelectorAll("button").forEach(b => {
+  b.onclick = () => {
+    layoutType = +b.dataset.layout;
+    layoutMenu.style.display = 'none';
+    build();
+  }
+});
+
+addElementsMenu.querySelectorAll("button").forEach(b => {
+  b.onclick = () => {
+    addElementMode = b.dataset.element;
+    addElementsMenu.style.display = 'none';
+    addElementsBtn.classList.add('active');
+    showTooltip("לחץ על שני גלגלים כדי להוסיף " + b.textContent);
+  }
+});
+
+sizeMenu.querySelectorAll("button").forEach(b => {
+  b.onclick = () => {
+    const size = b.dataset.size;
+    switch(size) {
+      case 'small': baseSize = 5; break;
+      case 'medium': baseSize = 10; break;
+      case 'large': baseSize = 15; break;
+      case 'random': baseSize = 5 + Math.random() * 10; break;
+    }
+    document.getElementById("baseSize").value = baseSize;
+    sizeMenu.style.display = 'none';
+    build();
+  }
+});
+
+// פונקציית הצגת הודעת עזר
+function showTooltip(msg, duration = 3000) {
+  tooltip.textContent = msg;
+  tooltip.style.display = 'block';
+  if(duration > 0) {
+    setTimeout(() => {
+      tooltip.style.display = 'none';
+    }, duration);
+  }
+}
+
+// פונקציית צבע לפי מרחק
+function heatColor(d) {
+  const t = Math.min(d/300,1), hue = 240 - 240 * t;
+  return `hsl(${hue},100%,50%)`;
+}
+
+// קבועים
+const TEAR_RADIUS = 120;
+let gears = [], springs = [], leds = [], wires = [], currents = [], particles = [];
+
+// מחלקת גלגל שיניים
+class Gear {
+  constructor(bx, by, r) {
+    this.bx = bx; this.by = by; this.r = r;
+    this.x = bx; this.y = by; this.i = 0;
+    this.rotation = 0;
+    this.teeth = Math.floor(r/2) + 3;
+    this.speed = 0.01 + Math.random() * 0.02;
+  }
+  
+  update(t) {
+    const dx = this.bx - pointerX, 
+          dy = this.by - pointerY,
+          d = Math.hypot(dx, dy),
+          randX = Math.sin(t * 0.001 + this.bx) * chaos * 20,
+          randY = Math.cos(t * 0.001 + this.by) * chaos * 20,
+          nx = dx / d || 0, 
+          ny = dy / d || 0,
+          spread = pointerActive ? (1 - Math.min(d / 300, 1)) * spreadScale : 0;
+    
+    this.i = d;
+    let x0 = this.bx + nx * spread + randX,
+        y0 = this.by + ny * spread + randY;
+    
+    if(pointerActive && d < TEAR_RADIUS) {
+      const relX = x0 - pointerX, 
+            relY = y0 - pointerY,
+            ang0 = Math.atan2(relY, relX),
+            r0 = Math.hypot(relX, relY),
+            swirl = (1 - d / TEAR_RADIUS) * Math.sin(t * 0.005) * 1.5,
+            ang1 = ang0 + swirl;
+      
+      x0 = pointerX + Math.cos(ang1) * r0;
+      y0 = pointerY + Math.sin(ang1) * r0;
+    }
+    
+    this.x = x0; 
+    this.y = y0;
+    this.rotation += this.speed;
+  }
+  
+  draw(c) {
+    c.save();
+    c.translate(this.x, this.y);
+    c.rotate(this.rotation);
+    
+    // ציור הגלגל
+    c.beginPath();
+    c.strokeStyle = heatColor(this.i);
+    c.arc(0, 0, this.r * 0.6, 0, 2 * Math.PI);
+    c.stroke();
+    
+    // ציור השיניים
+    const teethLength = this.r * 0.3;
+    for(let i = 0; i < this.teeth; i++) {
+      const angle = (i / this.teeth) * 2 * Math.PI;
+      c.beginPath();
+      c.moveTo(
+        Math.cos(angle) * (this.r * 0.6),
+        Math.sin(angle) * (this.r * 0.6)
+      );
+      c.lineTo(
+        Math.cos(angle) * (this.r * 0.6 + teethLength),
+        Math.sin(angle) * (this.r * 0.6 + teethLength)
+      );
+      c.stroke();
+    }
+    
+    c.restore();
+  }
+}
+
+// מחלקת קפיץ
+class Spring {
+  constructor(g1, g2, f) { 
+    this.g1 = g1; 
+    this.g2 = g2; 
+    this.f = f;
+    this.width = 2 + Math.random() * 2;
+  }
+  
+  draw(c, t) {
+    const dx = this.g2.x - this.g1.x, 
+          dy = this.g2.y - this.g1.y,
+          d = Math.hypot(dx, dy), 
+          ang = Math.atan2(dy, dx);
+    
+    c.save(); 
+    c.translate(this.g1.x, this.g1.y); 
+    c.rotate(ang);
+    c.strokeStyle = heatColor((this.g1.i + this.g2.i) / 2);
+    c.lineWidth = this.width;
+    c.beginPath();
+    
+    const segments = 20;
+    for(let i = 0; i < segments; i++) {
+      const x = d * i / segments, 
+            y = Math.sin(i * 0.8 + t * this.f) * 6;
+      c.lineTo(x, y);
+    }
+    
+    c.stroke(); 
+    c.restore();
+  }
+}
+
+// מחלקת נורית LED
+class LED {
+  constructor(g, f) { 
+    this.g = g; 
+    this.f = f;
+    this.size = 4 + Math.random() * 3;
+  }
+  
+  draw(c, t) {
+    c.beginPath(); 
+    c.arc(this.g.x, this.g.y, this.size, 0, 2 * Math.PI);
+    c.fillStyle = Math.sin(t * this.f) > 0 ? heatColor(this.g.i) : "white";
+    c.fill(); 
+    c.strokeStyle = document.body.classList.contains("dark") ? "#fff" : "#000";
+    c.stroke();
+  }
+}
+
+// מחלקת קשר חשמלי
+class Wire {
+  constructor(g1, g2) {
+    this.g1 = g1;
+    this.g2 = g2;
+    this.nodes = [];
+    this.segments = 5;
+    this.width = 1;
+    this.color = "#888";
+    this.particles = [];
+    
+    // יצירת נקודות ביניים
+    for(let i = 0; i <= this.segments; i++) {
+      this.nodes.push({
+        x: g1.x + (g2.x - g1.x) * i / this.segments,
+        y: g1.y + (g2.y - g1.y) * i / this.segments,
+        offsetX: (Math.random() - 0.5) * 10,
+        offsetY: (Math.random() - 0.5) * 10
+      });
+    }
+    
+    // יצירת חלקיקים לקשר
+    for(let i = 0; i < 5; i++) {
+      this.particles.push({
+        progress: Math.random(),
+        speed: 0.005 + Math.random() * 0.01,
+        size: 2 + Math.random() * 2
+      });
+    }
+  }
+  
+  update(t) {
+    // עדכון תנודות הקשר
+    for(let i = 1; i < this.nodes.length - 1; i++) {
+      this.nodes[i].offsetX = Math.sin(t * 0.002 + i) * 8;
+      this.nodes[i].offsetY = Math.cos(t * 0.003 + i) * 8;
+    }
+    
+    // עדכון חלקיקים
+    this.particles.forEach(p => {
+      p.progress += p.speed;
+      if(p.progress > 1) p.progress = 0;
+    });
+  }
+  
+  draw(c) {
+    c.beginPath();
+    c.strokeStyle = this.color;
+    c.lineWidth = this.width;
+    
+    // ציור הקשר עם נקודות ביניים
+    c.moveTo(this.g1.x, this.g1.y);
+    for(let i = 1; i < this.nodes.length - 1; i++) {
+      const node = this.nodes[i];
+      c.lineTo(node.x + node.offsetX, node.y + node.offsetY);
+    }
+    c.lineTo(this.g2.x, this.g2.y);
+    
+    c.stroke();
+    
+    // ציור חלקיקים על הקשר
+    this.particles.forEach(p => {
+      const progress = p.progress;
+      let x, y;
+      
+      if(progress <= 0.2) {
+        const t = progress / 0.2;
+        x = this.g1.x + (this.nodes[1].x + this.nodes[1].offsetX - this.g1.x) * t;
+        y = this.g1.y + (this.nodes[1].y + this.nodes[1].offsetY - this.g1.y) * t;
+      } 
+      else if(progress <= 0.4) {
+        const t = (progress - 0.2) / 0.2;
+        x = this.nodes[1].x + this.nodes[1].offsetX + 
+            (this.nodes[2].x + this.nodes[2].offsetX - (this.nodes[1].x + this.nodes[1].offsetX)) * t;
+        y = this.nodes[1].y + this.nodes[1].offsetY + 
+            (this.nodes[2].y + this.nodes[2].offsetY - (this.nodes[1].y + this.nodes[1].offsetY)) * t;
+      }
+      else if(progress <= 0.6) {
+        const t = (progress - 0.4) / 0.2;
+        x = this.nodes[2].x + this.nodes[2].offsetX + 
+            (this.nodes[3].x + this.nodes[3].offsetX - (this.nodes[2].x + this.nodes[2].offsetX)) * t;
+        y = this.nodes[2].y + this.nodes[2].offsetY + 
+            (this.nodes[3].y + this.nodes[3].offsetY - (this.nodes[2].y + this.nodes[2].offsetY)) * t;
+      }
+      else if(progress <= 0.8) {
+        const t = (progress - 0.6) / 0.2;
+        x = this.nodes[3].x + this.nodes[3].offsetX + 
+            (this.nodes[4].x + this.nodes[4].offsetX - (this.nodes[3].x + this.nodes[3].offsetX)) * t;
+        y = this.nodes[3].y + this.nodes[3].offsetY + 
+            (this.nodes[4].y + this.nodes[4].offsetY - (this.nodes[3].y + this.nodes[3].offsetY)) * t;
+      }
+      else {
+        const t = (progress - 0.8) / 0.2;
+        x = this.nodes[4].x + this.nodes[4].offsetX + 
+            (this.g2.x - (this.nodes[4].x + this.nodes[4].offsetX)) * t;
+        y = this.nodes[4].y + this.nodes[4].offsetY + 
+            (this.g2.y - (this.nodes[4].y + this.nodes[4].offsetY)) * t;
+      }
+      
+      // ציור החלקיק
+      c.beginPath();
+      c.arc(x, y, p.size, 0, 2 * Math.PI);
+      c.fillStyle = `hsla(60, 100%, 50%, ${0.7 + Math.sin(p.progress * Math.PI * 2) * 0.3})`;
+      c.fill();
+      
+      // אפקט הארה
+      const gradient = c.createRadialGradient(x, y, 0, x, y, p.size * 2);
+      gradient.addColorStop(0, `hsla(60, 100%, 70%, 0.5)`);
+      gradient.addColorStop(1, "hsla(60, 100%, 50%, 0)");
+      
+      c.beginPath();
+      c.arc(x, y, p.size * 2, 0, 2 * Math.PI);
+      c.fillStyle = gradient;
+      c.fill();
+    });
+  }
+}
+
+// מחלקת זרם חשמלי
+class Current {
+  constructor(g1, g2) {
+    this.g1 = g1;
+    this.g2 = g2;
+    this.progress = 0;
+    this.speed = 0.01 + Math.random() * 0.02;
+    this.size = 3 + Math.random() * 4;
+  }
+  
+  update() {
+    this.progress += this.speed;
+    if(this.progress > 1) this.progress = 0;
+  }
+  
+  draw(c) {
+    const x = this.g1.x + (this.g2.x - this.g1.x) * this.progress;
+    const y = this.g1.y + (this.g2.y - this.g1.y) * this.progress;
+    
+    c.beginPath();
+    c.arc(x, y, this.size, 0, 2 * Math.PI);
+    c.fillStyle = "#FF0";
+    c.fill();
+    
+    // אפקט הארה
+    const gradient = c.createRadialGradient(x, y, 0, x, y, this.size * 2);
+    gradient.addColorStop(0, "rgba(255,255,0,0.8)");
+    gradient.addColorStop(1, "rgba(255,255,0,0)");
+    
+    c.beginPath();
+    c.arc(x, y, this.size * 2, 0, 2 * Math.PI);
+    c.fillStyle = gradient;
+    c.fill();
+  }
+}
+
+// מחלקת חלקיק
+class Particle {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.vx = (Math.random() - 0.5) * 2;
+    this.vy = (Math.random() - 0.5) * 2;
+    this.size = 2 + Math.random() * 3;
+    this.life = 100 + Math.random() * 100;
+    this.maxLife = this.life;
+    this.color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+  }
+  
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.life--;
+    this.size *= 0.99;
+  }
+  
+  draw(c) {
+    const alpha = this.life / this.maxLife;
+    c.beginPath();
+    c.arc(this.x, this.y, this.size, 0, 2 * Math.PI);
+    c.fillStyle = this.color.replace(")", `, ${alpha})`).replace("hsl", "hsla");
+    c.fill();
+  }
+}
+
+// בניית המערכת
+function build() {
+  gears = []; 
+  springs = []; 
+  leds = [];
+  wires = [];
+  currents = [];
+  particles = [];
+  
+  const cols = Math.floor(12 * density * (scaleFactor / 100)), 
+        rows = Math.floor(8 * density * (scaleFactor / 100)),
+        sx = w / cols, 
+        sy = h / rows;
+  
+  let positions = [];
+  const scale = scaleFactor / 100;
+  
+  // בחירת סידור לפי layoutType
+  switch(layoutType) {
+    case 1: // רשת אקראית
+      for(let i = 0; i < cols * rows; i++) {
+        positions.push({
+          x: Math.random() * w * 0.8 + w * 0.1,
+          y: Math.random() * h * 0.8 + h * 0.1
+        });
+      }
+      break;
+      
+    case 2: // ספירלה
+      for(let i = 0; i < cols * rows; i++) {
+        const a = i * 0.2 * scale, r = 5 * scale + i * 2 * scale;
+        positions.push({
+          x: w/2 + Math.cos(a) * r,
+          y: h/2 + Math.sin(a) * r
+        });
+      }
+      break;
+      
+    case 3: // קרניים
+      for(let y = 0; y < rows; y++) {
+        for(let x = 0; x < cols; x++) {
+          const a = (x / cols) * 2 * Math.PI, 
+                r = (y / rows) * Math.min(w, h) / 2 * scale;
+          positions.push({
+            x: w/2 + Math.cos(a) * r,
+            y: h/2 + Math.sin(a) * r
+          });
+        }
+      }
+      break;
+      
+    case 4: // אלכסונים
+      for(let y = 0; y < rows; y++) {
+        for(let x = 0; x < cols; x++) {
+          positions.push({
+            x: x * sx * 1.5 * scale,
+            y: y * sy * scale + (x % 2 ? sy/2 * scale : 0)
+          });
+        }
+      }
+      break;
+      
+    case 5: // שחמט
+      for(let y = 0; y < rows; y++) {
+        for(let x = 0; x < cols; x++) {
+          positions.push({
+            x: x * sx * scale + (y % 3 ? sx/2 * scale : 0),
+            y: y * sy * scale + (x % 3 ? sy/2 * scale : 0)
+          });
+        }
+      }
+      break;
+      
+    case 6: // משושים
+      for(let y = 0; y < rows; y++) {
+        for(let x = 0; x < cols; x++) {
+          positions.push({
+            x: x * sx * 1.5 * scale + (y % 2 ? sx * 0.75 * scale : 0),
+            y: y * sy * 0.866 * scale
+          });
+        }
+      }
+      break;
+      
+    case 7: // מעגל
+      for(let i = 0; i < cols * rows; i++) {
+        const a = (i / (cols * rows)) * 2 * Math.PI;
+        positions.push({
+          x: w/2 + Math.cos(a) * (h/3) * scale,
+          y: h/2 + Math.sin(a) * (h/3) * scale
+        });
+      }
+      break;
+      
+    case 8: // לב
+      for(let i = 0; i < cols * rows; i++) {
+        const t = (i / (cols * rows)) * 2 * Math.PI;
+        const heartScale = 15 * scale;
+        const x = 16 * Math.pow(Math.sin(t), 3);
+        const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+        positions.push({
+          x: w/2 + x * heartScale,
+          y: h/2 + y * heartScale
+        });
+      }
+      break;
+      
+    case 9: // גלים
+      for(let y = 0; y < rows; y++) {
+        for(let x = 0; x < cols; x++) {
+          const waveX = Math.sin(y * 0.3) * 30 * scale;
+          positions.push({
+            x: x * sx * scale + waveX + sx/2 * scale,
+            y: y * sy * scale + sy/2 * scale
+          });
+        }
+      }
+      break;
+      
+    case 10: // פרקטל
+      for(let y = 0; y < rows; y++) {
+        for(let x = 0; x < cols; x++) {
+          const fX = x / cols * 5 - 2.5;
+          const fY = y / rows * 5 - 2.5;
+          const d = Math.sqrt(fX*fX + fY*fY);
+          const r = Math.sin(d * 3) * 50 * scale;
+          const a = Math.atan2(fY, fX);
+          positions.push({
+            x: w/2 + Math.cos(a) * r,
+            y: h/2 + Math.sin(a) * r
+          });
+        }
+      }
+      break;
+      
+    case 11: // כוכב
+      for(let i = 0; i < cols * rows; i++) {
+        const a = (i / (cols * rows)) * 2 * Math.PI;
+        const points = 5;
+        const r1 = 100 * scale, r2 = 40 * scale;
+        const r = i % 2 ? r1 : r2;
+        const angle = a * points;
+        positions.push({
+          x: w/2 + Math.cos(angle) * r,
+          y: h/2 + Math.sin(angle) * r
+        });
+      }
+      break;
+      
+    case 12: // לולאה
+      for(let i = 0; i < cols * rows; i++) {
+        const t = (i / (cols * rows)) * 2 * Math.PI;
+        const r = (100 + Math.sin(t * 3) * 50) * scale;
+        positions.push({
+          x: w/2 + Math.cos(t) * r,
+          y: h/2 + Math.sin(t) * r
+        });
+      }
+      break;
+      
+    case 13: // שבב
+      for(let y = 0; y < rows; y++) {
+        for(let x = 0; x < cols; x++) {
+          const offset = (x % 2 && y % 2) ? 0 : 
+                       (x % 2) ? -10 * scale : 
+                       (y % 2) ? 10 * scale : 0;
+          positions.push({
+            x: x * sx * scale + sx/2 * scale + offset,
+            y: y * sy * scale + sy/2 * scale + offset
+          });
+        }
+      }
+      break;
+      
+    case 14: // עיגולים קונצנטריים
+      const circles = 5;
+      const perCircle = Math.ceil(cols * rows / circles);
+      for(let c = 0; c < circles; c++) {
+        const radius = (50 + c * 50) * scale;
+        for(let i = 0; i < perCircle; i++) {
+          const a = (i / perCircle) * 2 * Math.PI;
+          positions.push({
+            x: w/2 + Math.cos(a) * radius,
+            y: h/2 + Math.sin(a) * radius
+          });
+        }
+      }
+      break;
+      
+    case 15: // מעוינים
+      for(let y = 0; y < rows; y++) {
+        for(let x = 0; x < cols; x++) {
+          positions.push({
+            x: x * sx * scale + (y % 2 ? sx/2 * scale : 0),
+            y: y * sy * 0.5 * scale
+          });
+        }
+      }
+      break;
+      
+    case 16: // קוביה
+      const cubeSize = Math.min(w, h) * 0.4 * scale;
+      const cubeCols = Math.max(3, Math.floor(cols / 2));
+      const cubeRows = Math.max(3, Math.floor(rows / 2));
+      for(let z = 0; z < 3; z++) {
+        for(let y = 0; y < cubeRows; y++) {
+          for(let x = 0; x < cubeCols; x++) {
+            const offsetX = (x - cubeCols/2) * (cubeSize/cubeCols);
+            const offsetY = (y - cubeRows/2) * (cubeSize/cubeRows);
+            const offsetZ = (z - 1) * (cubeSize/3);
+            const perspective = 1 + offsetZ / (cubeSize * 2);
+            positions.push({
+              x: w/2 + offsetX * perspective,
+              y: h/2 + offsetY * perspective
+            });
+          }
+        }
+      }
+      break;
+      
+    case 17: // ריבוע
+      const squareSize = Math.min(w, h) * 0.6 * scale;
+      for(let y = 0; y < rows; y++) {
+        for(let x = 0; x < cols; x++) {
+          const relX = (x / cols) * 2 - 1;
+          const relY = (y / rows) * 2 - 1;
+          positions.push({
+            x: w/2 + relX * squareSize/2,
+            y: h/2 + relY * squareSize/2
+          });
+        }
+      }
+      break;
+      
+    case 18: // קונוס
+      for(let i = 0; i < cols * rows; i++) {
+        const a = (i / (cols * rows)) * 2 * Math.PI;
+        const r = (1 - i/(cols * rows)) * Math.min(w, h)/3 * scale;
+        positions.push({
+          x: w/2 + Math.cos(a) * r,
+          y: h/2 + Math.sin(a) * r
+        });
+      }
+      break;
+      
+    case 19: // צילינדר
+      const cylinderR = Math.min(w, h)/4 * scale;
+      const cylinderH = Math.min(w, h)/3 * scale;
+      for(let z = 0; z < 3; z++) {
+        for(let i = 0; i < cols * rows / 3; i++) {
+          const a = (i / (cols * rows / 3)) * 2 * Math.PI;
+          positions.push({
+            x: w/2 + Math.cos(a) * cylinderR,
+            y: h/2 + (z - 1) * cylinderH/2 + Math.sin(a) * cylinderR * 0.3
+          });
+        }
+      }
+      break;
+      
+    case 20: // דונאט
+      const donutR1 = Math.min(w, h)/4 * scale;
+      const donutR2 = Math.min(w, h)/8 * scale;
+      for(let i = 0; i < cols * rows; i++) {
+        const a = (i / (cols * rows)) * 2 * Math.PI;
+        const b = i * 0.2;
+        positions.push({
+          x: w/2 + Math.cos(a) * (donutR1 + Math.cos(b) * donutR2),
+          y: h/2 + Math.sin(a) * (donutR1 + Math.cos(b) * donutR2)
+        });
+      }
+      break;
+      
+    case 21: // מדורג
+      for(let y = 0; y < rows; y++) {
+        for(let x = 0; x < cols; x++) {
+          const step = Math.floor(x / 3) * 20 * scale;
+          positions.push({
+            x: x * sx * scale + sx/2 * scale,
+            y: y * sy * scale + sy/2 * scale + step
+          });
+        }
+      }
+      break;
+      
+    case 22: // משובץ
+      for(let y = 0; y < rows; y++) {
+        for(let x = 0; x < cols; x++) {
+          const offset = (x % 2 && y % 2) ? 20 * scale : 
+                       (x % 2) ? -10 * scale : 
+                       (y % 2) ? 10 * scale : 0;
+          positions.push({
+            x: x * sx * scale + sx/2 * scale,
+            y: y * sy * scale + sy/2 * scale + offset
+          });
+        }
+      }
+      break;
+      
+    case 23: // מסולסל
+      for(let i = 0; i < cols * rows; i++) {
+        const t = (i / (cols * rows)) * 2 * Math.PI;
+        const r = (50 + Math.sin(t * 5) * 30) * scale;
+        positions.push({
+          x: w/2 + Math.cos(t) * r,
+          y: h/2 + Math.sin(t) * r
+        });
+      }
+      break;
+      
+    case 24: // נקי
+      for(let i = 0; i < cols * rows; i++) {
+        positions.push({
+          x: w/2 + (Math.random() - 0.5) * w * 0.4 * scale,
+          y: h/2 + (Math.random() - 0.5) * h * 0.4 * scale
+        });
+      }
+      break;
+      
+    case 25: // הקפי
+      for(let i = 0; i < cols * rows; i++) {
+        const a = (i / (cols * rows)) * 2 * Math.PI;
+        const r = Math.min(w, h)/2 * scale;
+        positions.push({
+          x: w/2 + Math.cos(a) * r,
+          y: h/2 + Math.sin(a) * r
+        });
+      }
+      break;
+      
+    case 26: // קלידוסקופי
+      for(let i = 0; i < cols * rows; i++) {
+        const a = (i / (cols * rows)) * 2 * Math.PI;
+        const r = (50 + Math.sin(a * 6) * 40) * scale;
+        positions.push({
+          x: w/2 + Math.cos(a) * r,
+          y: h/2 + Math.sin(a) * r
+        });
+      }
+      break;
+      
+    case 27: // פירמידה
+      const pyramidBase = Math.min(w, h) * 0.6 * scale;
+      const pyramidLevels = 5;
+      for(let level = 0; level < pyramidLevels; level++) {
+        const levelSize = pyramidBase * (1 - level/pyramidLevels);
+        const levelY = h/2 - level * 30 * scale;
+        const points = 4 + level;
+        for(let i = 0; i < points; i++) {
+          const a = (i / points) * 2 * Math.PI;
+          positions.push({
+            x: w/2 + Math.cos(a) * levelSize/2,
+            y: levelY + Math.sin(a) * levelSize/2
+          });
+        }
+      }
+      break;
+      
+    case 28: // מדוזה
+      for(let i = 0; i < cols * rows; i++) {
+        const t = (i / (cols * rows)) * 2 * Math.PI;
+        const r = (50 + Math.sin(t * 8) * 40) * scale;
+        positions.push({
+          x: w/2 + Math.cos(t) * r,
+          y: h/2 + Math.sin(t) * r * 1.2
+        });
+      }
+      break;
+      
+    case 29: // יהלום
+      for(let y = 0; y < rows; y++) {
+        for(let x = 0; x < cols; x++) {
+          const relX = (x / cols) * 2 - 1;
+          const relY = (y / rows) * 2 - 1;
+          const diamondX = relX * Math.min(w, h)/3 * scale;
+          const diamondY = relY * Math.min(w, h)/3 * scale * Math.abs(relX);
+          positions.push({
+            x: w/2 + diamondX,
+            y: h/2 + diamondY
+          });
+        }
+      }
+      break;
+      
+    case 30: // שעון
+      for(let i = 0; i < cols * rows; i++) {
+        const hour = i % 12;
+        const minute = Math.floor(i / 12) % 60;
+        const hourAngle = (hour / 12) * 2 * Math.PI;
+        const minuteAngle = (minute / 60) * 2 * Math.PI;
+        const hourHand = Math.min(w, h)/4 * scale;
+        const minuteHand = Math.min(w, h)/3 * scale;
+        positions.push({
+          x: w/2 + Math.cos(hourAngle) * hourHand * 0.7 + Math.cos(minuteAngle) * minuteHand * 0.3,
+          y: h/2 + Math.sin(hourAngle) * hourHand * 0.7 + Math.sin(minuteAngle) * minuteHand * 0.3
+        });
+      }
+      break;
+      
+    case 31: // כדור
+      for(let i = 0; i < cols * rows; i++) {
+        const phi = Math.acos(-1 + (2 * i) / (cols * rows));
+        const theta = Math.sqrt(cols * rows * Math.PI) * phi;
+        const r = Math.min(w, h)/3 * scale;
+        positions.push({
+          x: w/2 + r * Math.sin(phi) * Math.cos(theta),
+          y: h/2 + r * Math.sin(phi) * Math.sin(theta)
+        });
+      }
+      break;
+      
+    case 32: // קפיץ
+      for(let i = 0; i < cols * rows; i++) {
+        const t = (i / (cols * rows)) * 4 * Math.PI;
+        const r = 50 * scale;
+        const z = i * 2 * scale;
+        const perspective = 1 + z / (cols * rows * 2);
+        positions.push({
+          x: w/2 + Math.cos(t) * r * perspective,
+          y: h/2 + Math.sin(t) * r * perspective
+        });
+      }
+      break;
+      
+    default: // רשת רגילה
+      for(let y = 0; y < rows; y++) {
+        for(let x = 0; x < cols; x++) {
+          positions.push({
+            x: x * sx * scale + sx/2 * scale,
+            y: y * sy * scale + sy/2 * scale
+          });
+        }
+      }
+  }
+  
+  // יצירת גלגלי שיניים
+  positions.forEach(p => {
+    const g = new Gear(p.x, p.y, baseSize + Math.random() * 3);
+    gears.push(g);
+  });
+  
+  // חיבור שכנים בסידור רשת
+  if(layoutType === 0) {
+    for(let i = 0; i < gears.length; i++) {
+      if((i % cols) !== 0) springs.push(new Spring(gears[i], gears[i-1], 0.02));
+      if(i >= cols) springs.push(new Spring(gears[i], gears[i-cols], 0.02));
+    }
+  }
+  
+  // הוספת נוריות LED אקראיות
+  gears.forEach(g => { 
+    if(Math.random() > 0.85) leds.push(new LED(g, 0.05 + Math.random() * 0.05)); 
+  });
+  
+  // הוספת קשרים אקראיים
+  for(let i = 0; i < gears.length / 4; i++) {
+    const g1 = gears[Math.floor(Math.random() * gears.length)];
+    const g2 = gears[Math.floor(Math.random() * gears.length)];
+    if(g1 !== g2) wires.push(new Wire(g1, g2));
+  }
+  
+  // הוספת זרמים אקראיים
+  for(let i = 0; i < gears.length / 5; i++) {
+    const g1 = gears[Math.floor(Math.random() * gears.length)];
+    const g2 = gears[Math.floor(Math.random() * gears.length)];
+    if(g1 !== g2) currents.push(new Current(g1, g2));
+  }
+}
+
+// בנייה ראשונית
+build();
+
+// מציאת נקודת הגריד הקרובה ביותר
+function findNearestGridPoint(x, y) {
+  const step = gridSpacing;
+  const halfStep = step / 2;
+  
+  // חישוב נקודת הגריד הקרובה ביותר
+  const gridX = Math.round((x - halfStep) / step) * step + halfStep;
+  const gridY = Math.round((y - halfStep) / step) * step + halfStep;
+  
+  // הגבלה לגבולות המסך
+  return {
+    x: Math.max(halfStep, Math.min(w - halfStep, gridX)),
+    y: Math.max(halfStep, Math.min(h - halfStep, gridY))
+  };
+}
+
+// ציור רשת רקע
+function drawGrid(t) {
+  if(document.body.classList.contains("dark")) {
+    ctxBg.fillStyle = "#111"; 
+    ctxBg.fillRect(0, 0, w, h);
+    ctxBg.strokeStyle = "rgba(0,255,255,0.05)";
+  } else {
+    ctxBg.clearRect(0, 0, w, h);
+    ctxBg.strokeStyle = "rgba(0,0,0,0.05)";
+  }
+  
+  const step = gridSpacing;
+  for(let x = 0; x < w; x += step) {
+    ctxBg.beginPath(); ctxBg.moveTo(x, 0); ctxBg.lineTo(x, h); ctxBg.stroke();
+  }
+  for(let y = 0; y < h; y += step) {
+    ctxBg.beginPath(); ctxBg.moveTo(0, y); ctxBg.lineTo(w, y); ctxBg.stroke();
+  }
+  
+  // ציור נקודות צומת
+  if(gridMode) {
+    ctxBg.fillStyle = document.body.classList.contains("dark") ? "rgba(255,100,100,0.3)" : "rgba(255,0,0,0.3)";
+    for(let x = step/2; x < w; x += step) {
+      for(let y = step/2; y < h; y += step) {
+        ctxBg.beginPath();
+        ctxBg.arc(x, y, 2, 0, Math.PI * 2);
+        ctxBg.fill();
+      }
+    }
+  }
+}
+
+// ציור קוד בינארי
+function drawBinary() {
+  ctxBin.clearRect(0, 0, w, h);
+  ctxBin.font = "8px monospace";
+  ctxBin.fillStyle = document.body.classList.contains("bw")
+    ? "rgba(0,255,255,0.35)" : "rgba(0,0,0,0.2)";
+  
+  gears.forEach(g => {
+    const bx = Math.round(g.x).toString(2).padStart(10, "0"),
+          by = Math.round(g.y).toString(2).padStart(10, "0");
+    ctxBin.fillText(bx + " " + by, g.x + 5, g.y - 5);
+  });
+}
+
+// ציור קוד המקור
+function drawCode(t) {
+  ctxCode.clearRect(0, 0, w, h);
+  charIndex = Math.min(charIndex + 5, codeText.length);
+  const lines = codeText.slice(0, charIndex).match(/.{1,80}/g) || [];
+  
+  ctxCode.save();
+  if(pointerActive) {
+    ctxCode.beginPath();
+    ctxCode.arc(pointerX, pointerY, TEAR_RADIUS, 0, 2 * Math.PI);
+    ctxCode.clip();
+  }
+  
+  ctxCode.font = "12px monospace";
+  ctxCode.fillStyle = document.body.classList.contains("bw") ? "#00ffff" :
+    (document.body.classList.contains("dark") ? "#0f0" : "#00f");
+  
+  lines.forEach((ln, i) => ctxCode.fillText(ln, 10, 20 + i * 14));
+  ctxCode.restore();
+}
+
+// יצירת חלקיקים
+function createParticles(x, y, count = 10) {
+  for(let i = 0; i < count; i++) {
+    particles.push(new Particle(x, y));
+  }
+}
+
+// לולאת אנימציה
+function animate(t) {
+  drawGrid(t);
+  drawBinary();
+  drawCode(t);
+  ctx.clearRect(0, 0, w, h);
+  
+  // עדכון רכיבים
+  gears.forEach(g => g.update(t));
+  wires.forEach(w => w.update(t));
+  currents.forEach(c => c.update());
+  
+  // הסרת חלקיקים מתים
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => p.update());
+  
+  // ציור רכיבים
+  springs.forEach(s => s.draw(ctx, t));
+  wires.forEach(w => w.draw(ctx));
+  currents.forEach(c => c.draw(ctx));
+  gears.forEach(g => g.draw(ctx));
+  leds.forEach(l => l.draw(ctx, t));
+  particles.forEach(p => p.draw(ctx));
+  
+  requestAnimationFrame(animate);
+}
+
+// התחלת אנימציה
+animate(0);
+
+// אירועי מצביע
+let selectedGear = null;
+
+fg.addEventListener("pointermove", e => {
+  pointerX = e.clientX;
+  pointerY = e.clientY;
+  
+  if(gridMode) {
+    const gridPos = findNearestGridPoint(pointerX, pointerY);
+    gridPoint.style.left = gridPos.x + 'px';
+    gridPoint.style.top = gridPos.y + 'px';
+  }
+});
+
+fg.addEventListener("pointerdown", e => {
+  pointerActive = true;
+  pointerX = e.clientX; 
+  pointerY = e.clientY;
+  
+  if(gridMode) {
+    const gridPos = findNearestGridPoint(pointerX, pointerY);
+    const newGear = new Gear(gridPos.x, gridPos.y, baseSize + Math.random() * 3);
+    gears.push(newGear);
+    createParticles(gridPos.x, gridPos.y, 10);
+    return;
+  }
+  
+  if(isolateMode || addElementMode) {
+    let nearest = null, md = Infinity;
+    
+    gears.forEach(g => {
+      const d = Math.hypot(g.x - pointerX, g.y - pointerY);
+      if(d < md && d < 30) { md = d; nearest = g; }
+    });
+    
+    if(nearest) {
+      if(isolateMode) {
+        // הוספת שכנים חדשים
+        for(let k = 0; k < 6; k++) {
+          const ang = k * (Math.PI * 2 / 6);
+          const nx = nearest.bx + Math.cos(ang) * 50;
+          const ny = nearest.by + Math.sin(ang) * 50;
+          const ng = new Gear(nx, ny, baseSize + Math.random() * 3);
+          gears.push(ng);
+          springs.push(new Spring(nearest, ng, 0.02));
+          if(Math.random() > 0.75) leds.push(new LED(ng, 0.05 + Math.random() * 0.05));
+        }
+        createParticles(nearest.x, nearest.y, 20);
+      } else if(addElementMode) {
+        if(!selectedGear) {
+          selectedGear = nearest;
+          showTooltip("בחר גלגל שני להוספת " + 
+            (addElementMode === 'spring' ? 'קפיץ' : 
+             addElementMode === 'led' ? 'נורית' :
+             addElementMode === 'wire' ? 'קשר' :
+             addElementMode === 'current' ? 'זרם' : 'רכיב'), 0);
+        } else if(selectedGear !== nearest) {
+          switch(addElementMode) {
+            case 'spring':
+              springs.push(new Spring(selectedGear, nearest, 0.02 + Math.random() * 0.03));
+              break;
+            case 'led':
+              leds.push(new LED(nearest, 0.05 + Math.random() * 0.05));
+              break;
+            case 'wire':
+              wires.push(new Wire(selectedGear, nearest));
+              break;
+            case 'current':
+              currents.push(new Current(selectedGear, nearest));
+              break;
+            case 'particle':
+              createParticles(nearest.x, nearest.y, 30);
+              break;
+            case 'cluster':
+              for(let i = 0; i < 3; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 10 + Math.random() * 40;
+                const nx = nearest.x + Math.cos(angle) * dist;
+                const ny = nearest.y + Math.sin(angle) * dist;
+                const ng = new Gear(nx, ny, baseSize * 0.7 + Math.random() * 2);
+                gears.push(ng);
+                springs.push(new Spring(nearest, ng, 0.03 + Math.random() * 0.04));
+              }
+              break;
+            case 'gear':
+              const newGear = new Gear(nearest.x + (Math.random() - 0.5) * 80, 
+                                      nearest.y + (Math.random() - 0.5) * 80, 
+                                      baseSize * 0.8 + Math.random() * 2);
+              gears.push(newGear);
+              springs.push(new Spring(nearest, newGear, 0.03));
+              break;
+          }
+          createParticles(nearest.x, nearest.y, 15);
+          selectedGear = null;
+          addElementMode = null;
+          addElementsBtn.classList.remove('active');
+          tooltip.style.display = 'none';
+        }
+      }
+    }
+  }
+});
+
+fg.addEventListener("pointerup", () => { 
+  pointerActive = false; 
+});
+
+// טיפול במגע רב-אצבע (zoom)
+fg.addEventListener("touchmove", e => {
+  if(e.touches.length >= 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    spreadScale = Math.max(30, Math.min(150, Math.hypot(dx, dy)));
+    pointerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    pointerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    e.preventDefault();
+  }
+}, { passive: false });
+
+// סגירת תפריטים בלחיצה בחוץ
+document.addEventListener('click', (e) => {
+  if(!layoutMenu.contains(e.target) && e.target !== layoutBtn) {
+    layoutMenu.style.display = 'none';
+  }
+  if(!addElementsMenu.contains(e.target) && e.target !== addElementsBtn) {
+    addElementsMenu.style.display = 'none';
+  }
+  if(!sizeMenu.contains(e.target) && e.target !== sizeBtn) {
+    sizeMenu.style.display = 'none';
+  }
+});
+</script>
+</body>
+</html>

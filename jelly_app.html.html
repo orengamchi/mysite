@@ -1,0 +1,1910 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Claytronix - מדוזות סייבר (מתוקן)</title>
+  <style>
+    /* Reset and Base Styles */
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+      touch-action: manipulation;
+      font-family: 'Courier New', monospace;
+      -webkit-text-size-adjust: none;
+      text-size-adjust: none;
+      position: fixed;
+      width: 100%;
+      height: 100%;
+    }
+    
+    #canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+    }
+    
+    /* Top Toolbar (Global Warehouse) - CYBER STYLE */
+    #toolbar {
+      position: fixed;
+      top: env(safe-area-inset-top, 0);
+      left: 0;
+      right: 0;
+      height: 50px;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 101;
+      padding: 0 10px;
+      border-bottom: 1px solid #0ff;
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+    }
+    
+    .toolbar-icon {
+      position: relative;
+      width: 40px;
+      height: 40px;
+      cursor: pointer;
+      flex-shrink: 0;
+      background: rgba(0, 20, 30, 0.7);
+      border-radius: 8px;
+      border: 1px solid #0ff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+    }
+    
+    .toolbar-icon:hover {
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.8);
+      transform: translateY(-2px);
+    }
+    
+    /* Cyber Style for Icon Counts */
+    .icon-count {
+      position: absolute;
+      bottom: -8px;
+      right: -8px;
+      background: linear-gradient(45deg, #0ff, #0cf);
+      color: #000;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 12px;
+      font-weight: bold;
+      font-family: 'Courier New', monospace;
+      text-shadow: 0 0 5px #0ff, 0 0 10px #0ff;
+      border: 1px solid #0ff;
+      box-shadow: 0 0 8px #0ff, 0 0 12px #0ff;
+      animation: pulse 1.5s infinite alternate;
+    }
+    
+    /* אנימציות חדשות להבהוב וזוהר */
+    @keyframes icon-glow {
+      0%, 100% {
+        box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        transform: scale(1);
+      }
+      50% {
+        box-shadow: 0 0 20px #0ff, 0 0 30px #0ff;
+        transform: scale(1.1);
+      }
+    }
+    
+    @keyframes svg-glow {
+      0%, 100% {
+        filter: drop-shadow(0 0 5px rgba(0, 255, 255, 0.7));
+      }
+      50% {
+        filter: drop-shadow(0 0 15px #0ff) brightness(1.5);
+      }
+    }
+    
+    .toolbar-icon.glow-effect {
+      animation: icon-glow 1.5s infinite;
+    }
+    
+    .toolbar-icon.glow-effect svg {
+      animation: svg-glow 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+        box-shadow: 0 0 8px #0ff, 0 0 12px #0ff;
+      }
+      100% {
+        transform: scale(1.1);
+        box-shadow: 0 0 12px #0ff, 0 0 20px #0ff;
+      }
+    }
+    
+    /* Hidden Instructions Overlay */
+    #instructions {
+      position: fixed;
+      top: calc(50px + env(safe-area-inset-top, 0));
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: 90%;
+      max-height: 60vh;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.95);
+      color: #0ff;
+      padding: 15px;
+      border: 2px solid #0ff;
+      border-radius: 8px;
+      z-index: 103;
+      display: none;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-overflow-scrolling: touch;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+    }
+    
+    #instructions strong {
+      color: #fff;
+      text-shadow: 0 0 10px #0ff;
+    }
+    
+    /* Title Container */
+    .title-container {
+      position: absolute;
+      top: 20%;
+      left: 0;
+      right: 0;
+      text-align: center;
+      z-index: 50;
+      pointer-events: none;
+      transition: all 0.3s ease;
+    }
+    
+    .title-letter {
+      display: inline-block;
+      color: rgba(0, 255, 255, 0.1);
+      font-size: 8vw;
+      font-weight: bold;
+      margin: 0 0.5vw;
+      text-shadow: 0 0 10px rgba(0,255,255,0.3);
+      transition: all 0.5s ease;
+    }
+    
+    /* Info Button - Made smaller */
+    #info-btn {
+      position: relative;
+      width: 28px;
+      height: 28px;
+      background: #0ff;
+      border-radius: 50%;
+      color: #000;
+      font-weight: bold;
+      font-size: 16px;
+      line-height: 28px;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+      touch-action: manipulation;
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.7);
+      border: 1px solid #000;
+    }
+    
+    #info-btn:hover {
+      transform: scale(1.2);
+      box-shadow: 0 0 20px rgba(0, 255, 255, 1);
+    }
+    
+    /* Electronic Components Icons - Positioned at bottom */
+    .component-icon {
+      position: fixed;
+      width: 80px;
+      height: 80px;
+      background: rgba(0, 0, 0, 0.7);
+      border-radius: 10px;
+      border: 2px solid #0ff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 40px;
+      color: #0ff;
+      z-index: 104;
+      opacity: 0.25;
+      transform: scale(0.9);
+      transition: all 0.5s ease;
+      box-shadow: 0 0 20px #0ff;
+      font-family: 'Courier New', monospace;
+      flex-direction: column;
+      padding: 5px;
+      bottom: calc(20px + env(safe-area-inset-bottom, 0));
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    
+    .component-icon.visible {
+      opacity: 0.25;
+      transform: scale(0.9);
+    }
+    
+    .component-icon.active {
+      opacity: 0.85;
+      transform: scale(1);
+    }
+    
+    .component-count {
+      font-size: 14px;
+      margin-top: 5px;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      text-shadow: 0 0 5px #0ff;
+    }
+    
+    /* Position each component icon horizontally */
+    #digital-board {
+      left: 5%;
+    }
+    
+    #electric-motor {
+      left: 25%;
+    }
+    
+    #fan-propeller {
+      left: 45%;
+    }
+    
+    #electric-wires {
+      left: 65%;
+    }
+    
+    /* Drone icon - initially hidden */
+    #drone-icon {
+      left: 85%;
+      font-size: 36px;
+      display: none;
+    }
+    
+    /* Live Code Display */
+    .code-display {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid #0ff;
+      border-radius: 5px;
+      padding: 8px;
+      color: #0ff;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      white-space: pre;
+      z-index: 105;
+      max-width: 200px;
+      overflow: hidden;
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+      pointer-events: none;
+    }
+    
+    /* Collaborative Code Editor */
+    #collaborative-code {
+      position: fixed;
+      bottom: calc(100px + env(safe-area-inset-bottom, 0));
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 600px;
+      height: 200px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 2px solid #0ff;
+      border-radius: 8px;
+      color: #0ff;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      padding: 10px;
+      z-index: 106;
+      overflow: auto;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      display: none;
+    }
+    
+    #collaborative-code-content {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+    }
+    
+    /* Responsive Adjustments */
+    @media (max-width: 600px), (max-height: 600px) {
+      .title-letter {
+        font-size: 10vw;
+        margin: 0 0.3vw;
+      }
+      
+      #instructions {
+        font-size: 12px;
+        padding: 10px;
+        max-height: 50vh;
+      }
+      
+      .component-icon {
+        width: 60px;
+        height: 60px;
+        font-size: 30px;
+        bottom: calc(10px + env(safe-area-inset-bottom, 0));
+      }
+      
+      #drone-icon {
+        font-size: 28px;
+      }
+      
+      .component-count {
+        font-size: 10px;
+      }
+      
+      /* Adjust positions for mobile */
+      #digital-board {
+        left: 2%;
+      }
+      
+      #electric-motor {
+        left: 22%;
+      }
+      
+      #fan-propeller {
+        left: 42%;
+      }
+      
+      #electric-wires {
+        left: 62%;
+      }
+      
+      #drone-icon {
+        left: 82%;
+      }
+      
+      .code-display {
+        font-size: 8px;
+        max-width: 150px;
+        padding: 5px;
+      }
+      
+      #collaborative-code {
+        height: 150px;
+        font-size: 10px;
+        bottom: calc(80px + env(safe-area-inset-bottom, 0));
+      }
+      
+      /* Adjust toolbar for landscape */
+      @media (orientation: landscape) {
+        #toolbar {
+          height: 40px;
+        }
+        
+        #instructions {
+          top: calc(40px + env(safe-area-inset-top, 0));
+          max-height: 50vh;
+        }
+        
+        .title-container {
+          top: 10%;
+        }
+        
+        .title-letter {
+          font-size: 6vw;
+        }
+        
+        #collaborative-code {
+          height: 120px;
+          bottom: calc(70px + env(safe-area-inset-bottom, 0));
+        }
+      }
+    }
+    
+    /* Portrait-specific adjustments */
+    @media (orientation: portrait) and (max-width: 600px) {
+      .title-letter {
+        font-size: 12vw;
+      }
+    }
+    
+    /* Title Illuminated Effect */
+    .illuminated .title-letter {
+      color: #fff !important;
+      text-shadow: 0 0 20px #fff, 0 0 30px #0ff, 0 0 40px #0ff;
+    }
+    
+    /* Cyber Glitch Effect for Counters */
+    @keyframes glitch {
+      0% {
+        text-shadow: 0 0 5px #0ff, 0 0 10px #0ff;
+      }
+      25% {
+        text-shadow: 1px 0 5px #0ff, 2px 0 10px #0ff;
+      }
+      50% {
+        text-shadow: -1px 0 5px #f0f, -2px 0 10px #f0f;
+      }
+      75% {
+        text-shadow: 0 1px 5px #0ff, 0 2px 10px #0ff;
+      }
+      100% {
+        text-shadow: 0 -1px 5px #0ff, 0 -2px 10px #0ff;
+      }
+    }
+    
+    .cyber-counter {
+      animation: glitch 0.5s infinite alternate;
+    }
+    
+    /* Counter with icon inside */
+    .counter-with-icon {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    
+    .counter-icon {
+      font-size: 24px;
+      margin-bottom: 2px;
+    }
+    
+    .counter-number {
+      font-size: 12px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Toolbar with counters containing icons -->
+  <div id="toolbar">
+    <div class="toolbar-icon counter-with-icon" id="icon-spring" title="קפיץ">
+      <div class="counter-icon">🌀</div>
+      <div class="counter-number cyber-counter" id="count-spring">0</div>
+    </div>
+    <div class="toolbar-icon counter-with-icon" id="icon-magnet" title="מגנט">
+      <div class="counter-icon">🧲</div>
+      <div class="counter-number cyber-counter" id="count-magnet">0</div>
+    </div>
+    <div class="toolbar-icon counter-with-icon" id="icon-lamp" title="מנורה">
+      <div class="counter-icon">💡</div>
+      <div class="counter-number cyber-counter" id="count-lamp">0</div>
+    </div>
+    <div class="toolbar-icon counter-with-icon" id="icon-gear" title="גלגל שיניים">
+      <div class="counter-icon">⚙</div>
+      <div class="counter-number cyber-counter" id="count-gear">0</div>
+    </div>
+    <div id="info-btn" title="הוראות">i</div>
+  </div>
+  
+  <!-- Hidden Instructions Overlay -->
+  <div id="instructions">
+    <strong>הוראות:</strong><br>
+    נגע/הזז כדי לשלוט במדוזות.<br>
+    הטה את המכשיר לניווט.<br>
+    לחיצה כפולה על מדוזה פותחת/סוגרת רשת נודים (Mind Map) המציגה את האייקונים למערכות הנודים,<br>
+    ובצמוד לכל אחד מוצג מספר הרכיבים שצברה המדוזה.<br>
+    לחיצה כפולה באזור ריק מוסיפה מדוזה חדשה.<br>
+    לחיצה ארוכה להסרת מדוזה.<br>
+    כל מדוזה מייצגת את אחד הרכיבים.<br>
+    כאשר מדוזה צוברת 20 רכיבים, היא נעלמת עם אפקט סייבר והערך הצבור נשמר.<br>
+    כל 50 רכיבים מכל סוג יוצרים רכיב אלקטרוני חדש לפי הסדר: לוח דיגיטלי, מנוע חשמלי, מדחף מאוורר, חוטי חשמל.<br>
+    <br>
+    <strong>כתיבת קוד משותפת:</strong><br>
+    כאשר מספר מדוזות מאותו סוג נמצאות בקרבת מקום, הן יתחילו לכתוב קוד HTML5 יחד בחלונית הקוד המשותפת.<br>
+    הקוד יוצג בתחתית המסך ויתעדכן בזמן אמת.<br>
+    <br>
+    <strong>חדש:</strong><br>
+    לחיצה באמצע העכבר (middle click) תוסיף מיידית מדוזה חדשה במקום הלחיצה.
+  </div>
+  
+  <!-- Electronic Components Icons - Positioned at bottom -->
+  <div id="digital-board" class="component-icon visible" title="לוח דיגיטלי">
+    <div>📟</div>
+    <div class="component-count">0</div>
+  </div>
+  <div id="electric-motor" class="component-icon visible" title="מנוע חשמלי">
+    <div>⚙️</div>
+    <div class="component-count">0</div>
+  </div>
+  <div id="fan-propeller" class="component-icon visible" title="מדחף מאוורר">
+    <div>🌀</div>
+    <div class="component-count">0</div>
+  </div>
+  <div id="electric-wires" class="component-icon visible" title="חוטי חשמל">
+    <div>🔌</div>
+    <div class="component-count">0</div>
+  </div>
+  <!-- Drone icon - initially hidden -->
+  <div id="drone-icon" class="component-icon" title="רחפן">
+    <div>🚁</div>
+  </div>
+  
+  <!-- Collaborative Code Editor -->
+  <div id="collaborative-code">
+    <pre id="collaborative-code-content"></pre>
+  </div>
+  
+  <!-- Canvas and Title Container -->
+  <canvas id="canvas"></canvas>
+  <div class="title-container" id="titleContainer">
+    <span class="title-letter">C</span>
+    <span class="title-letter">L</span>
+    <span class="title-letter">A</span>
+    <span class="title-letter">Y</span>
+    <span class="title-letter">T</span>
+    <span class="title-letter">R</span>
+    <span class="title-letter">O</span>
+    <span class="title-letter">N</span>
+    <span class="title-letter">I</span>
+    <span class="title-letter">X</span>
+  </div>
+  
+  <script>
+    /* ========= Global Component Accumulators ========= */
+    let globalSpring = 0, globalMagnet = 0, globalLamp = 0, globalGear = 0;
+    let componentCounts = {
+      digitalBoard: 0,
+      electricMotor: 0,
+      fanPropeller: 0,
+      electricWires: 0
+    };
+    let currentComponentIndex = 0;
+    const componentOrder = ['digitalBoard', 'electricMotor', 'fanPropeller', 'electricWires'];
+    let allComponentsCompleted = false;
+    
+    /* ========= Collaborative Code Editor ========= */
+    const collaborativeCode = document.getElementById("collaborative-code");
+    const collaborativeCodeContent = document.getElementById("collaborative-code-content");
+    let collaborativeCodeVisible = false;
+    let currentCode = "";
+    let codeWritingJellies = [];
+    
+    // פונקציה מייצרת קוד HTML5 לכל סוג מדוזה
+    function generateHTML5Code(jellyType, count) {
+      const colors = {
+        spring: "#00ffff",
+        magnet: "#ff00ff",
+        lamp: "#ffff00",
+        gear: "#00ff00"
+      };
+      
+      const bgPatterns = {
+        spring: "background: radial-gradient(circle, rgba(0,255,255,0.2) 0%, rgba(0,0,0,1) 100%);",
+        magnet: "background: linear-gradient(45deg, rgba(255,0,255,0.1) 0%, rgba(0,0,0,1) 100%);",
+        lamp: "background: linear-gradient(to bottom, rgba(255,255,0,0.2) 0%, rgba(0,0,0,1) 100%);",
+        gear: "background: linear-gradient(to right, rgba(0,255,0,0.1) 0%, rgba(0,0,0,1) 100%);"
+      };
+      
+      const animations = {
+        spring: `@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}`,
+        magnet: `@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.1); opacity: 1; }
+}`,
+        lamp: `@keyframes glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(255,255,0,0.5); }
+  50% { box-shadow: 0 0 30px rgba(255,255,0,0.9); }
+}`,
+        gear: `@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}`
+      };
+      
+      const elements = {
+        spring: `<div class="spring" style="
+  position: absolute;
+  width: ${50 + count * 2}px;
+  height: ${50 + count * 2}px;
+  background: ${colors[jellyType]};
+  border-radius: 50%;
+  animation: float 3s ease-in-out infinite;
+  filter: blur(${count/10}px);
+"></div>`,
+        magnet: `<div class="magnet" style="
+  position: absolute;
+  width: ${40 + count}px;
+  height: ${40 + count}px;
+  background: ${colors[jellyType]};
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  animation: pulse 2s ease infinite;
+"></div>`,
+        lamp: `<div class="lamp" style="
+  position: absolute;
+  width: ${30 + count}px;
+  height: ${30 + count}px;
+  background: ${colors[jellyType]};
+  border-radius: 5px;
+  animation: glow 1.5s ease infinite;
+"></div>`,
+        gear: `<div class="gear" style="
+  position: absolute;
+  width: ${60 + count}px;
+  height: ${60 + count}px;
+  background: ${colors[jellyType]};
+  clip-path: circle(50% at 50% 50%);
+  animation: spin ${4 - count/10}s linear infinite;
+"></div>`
+      };
+      
+      return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${jellyType} Generated Page</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      ${bgPatterns[jellyType]}
+      overflow: hidden;
+    }
+    
+    .container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    
+    ${animations[jellyType]}
+    
+    .count-display {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      color: ${colors[jellyType]};
+      font-family: 'Courier New', monospace;
+      font-size: 24px;
+      text-shadow: 0 0 10px ${colors[jellyType]};
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    ${Array(count).fill(elements[jellyType]).join('\n    ')}
+    <div class="count-display">${jellyType} count: ${count}</div>
+  </div>
+</body>
+</html>`;
+    }
+    
+    // בודק אם יש כמה מדוזות קרובות מאותו סוג, ואם כן - מייצר קוד HTML משותף
+    function checkForCodeCollaboration() {
+      codeWritingJellies = [];
+      
+      // Group jellies by type
+      const groups = {};
+      jellyfishes.forEach(jelly => {
+        const key = jelly.componentType;
+        if (!groups[key]) {
+          groups[key] = [];
+        }
+        groups[key].push(jelly);
+      });
+      
+      // Check each group for proximity
+      for (const type in groups) {
+        if (groups[type].length >= 2) {
+          // Check if at least 2 jellies of this type are close enough
+          for (let i = 0; i < groups[type].length; i++) {
+            for (let j = i + 1; j < groups[type].length; j++) {
+              const jelly1 = groups[type][i];
+              const jelly2 = groups[type][j];
+              const dist = Math.sqrt(Math.pow(jelly1.x - jelly2.x, 2) + Math.pow(jelly1.y - jelly2.y, 2));
+              
+              if (dist < 200) { // 200px threshold
+                if (!codeWritingJellies.includes(jelly1)) {
+                  codeWritingJellies.push(jelly1);
+                }
+                if (!codeWritingJellies.includes(jelly2)) {
+                  codeWritingJellies.push(jelly2);
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      updateCollaborativeCode();
+    }
+    
+    // מעדכן את חלון הקוד המשותף
+    function updateCollaborativeCode() {
+      if (codeWritingJellies.length === 0) {
+        if (collaborativeCodeVisible) {
+          collaborativeCode.style.display = "none";
+          collaborativeCodeVisible = false;
+        }
+        return;
+      }
+      
+      // Group jellies by type again
+      const groupedJellies = {};
+      codeWritingJellies.forEach(jelly => {
+        if (!groupedJellies[jelly.componentType]) {
+          groupedJellies[jelly.componentType] = [];
+        }
+        groupedJellies[jelly.componentType].push(jelly);
+      });
+      
+      // Generate HTML5 code based on jelly types and counts
+      let newCode = "<!-- Collaborative HTML5 Code Generated by Jellyfish -->\n";
+      newCode += "<!-- When jellies of the same type cluster, they generate HTML5 code -->\n\n";
+      
+      for (const type in groupedJellies) {
+        const count = groupedJellies[type].length;
+        newCode += `<!-- ${type} cluster (${count} jellies) -->\n`;
+        newCode += generateHTML5Code(type, count) + "\n\n";
+      }
+      
+      // Update the code display
+      if (newCode !== currentCode) {
+        currentCode = newCode;
+        collaborativeCodeContent.textContent = currentCode;
+        
+        if (!collaborativeCodeVisible) {
+          collaborativeCode.style.display = "block";
+          collaborativeCodeVisible = true;
+        }
+      }
+    }
+    
+    /* ========= Plasma Background ========= */
+    function drawPlasmaBackground() {
+      const time = Date.now() * 0.0005;
+      const cx = canvas.width / 2, cy = canvas.height / 2;
+      const maxRadius = Math.sqrt(cx * cx + cy * cy);
+      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxRadius);
+      const r = Math.floor((Math.sin(time) + 1) * 128);
+      const g = Math.floor((Math.sin(time + 2) + 1) * 128);
+      const b = Math.floor((Math.sin(time + 4) + 1) * 128);
+      gradient.addColorStop(0, "rgb(" + r + "," + g + "," + b + ")");
+      gradient.addColorStop(1, "black");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    
+    /* ========= Global Setup ========= */
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const titleContainer = document.getElementById("titleContainer");
+    const titleLetters = document.querySelectorAll(".title-letter");
+    const infoBtn = document.getElementById("info-btn");
+    const instructionsDiv = document.getElementById("instructions");
+    const componentIcons = {
+      digitalBoard: document.getElementById("digital-board"),
+      electricMotor: document.getElementById("electric-motor"),
+      fanPropeller: document.getElementById("fan-propeller"),
+      electricWires: document.getElementById("electric-wires"),
+      droneIcon: document.getElementById("drone-icon")
+    };
+    let deviceOrientation = { beta: 0, gamma: 0 };
+    let useDeviceOrientation = false;
+    let targetX = 0;
+    let targetY = 0;
+    let isInteracting = false;
+    let longPressTimer = null;
+    let pressStartX = 0;
+    let pressStartY = 0;
+    let controlledJellyfish = null;
+    
+    // מציגים את האייקונים של הרכיבים בהתחלה
+    componentIcons.digitalBoard.classList.add("visible");
+    componentIcons.electricMotor.classList.add("visible");
+    componentIcons.fanPropeller.classList.add("visible");
+    componentIcons.electricWires.classList.add("visible");
+    
+    // חלקיקי פיצוץ (אפקט סייבר)
+    const explosionParticles = [];
+    function updateExplosionParticles() {
+      for (let i = explosionParticles.length - 1; i >= 0; i--) {
+        const p = explosionParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+        if (p.life <= 0) explosionParticles.splice(i, 1);
+      }
+    }
+    function drawExplosionParticles() {
+      for (const p of explosionParticles) {
+        const alpha = p.life / 45;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${p.hue}, 100%, 70%, ${alpha})`;
+        ctx.fill();
+      }
+    }
+    
+    // אפקט הארה של הכותרת
+    let titleIlluminated = false;
+    function triggerTitleIllumination() {
+      titleIlluminated = true;
+      titleContainer.classList.add("illuminated");
+      setTimeout(() => {
+        titleIlluminated = false;
+        titleContainer.classList.remove("illuminated");
+      }, 3000);
+    }
+    
+    // מאזיני שינוי גודל
+    function handleResize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+      
+      targetX = width / 2;
+      targetY = height / 2;
+      
+      // שינוי גודל פונט באותיות הכותרת
+      if (window.matchMedia("(orientation: portrait)").matches) {
+        titleLetters.forEach(letter => {
+          letter.style.fontSize = Math.min(width * 0.08, height * 0.08) + "px";
+        });
+      } else {
+        titleLetters.forEach(letter => {
+          letter.style.fontSize = Math.min(width * 0.06, height * 0.1) + "px";
+        });
+      }
+    }
+    
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+    handleResize();
+    
+    // הטיית מכשיר אם זמין
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener("deviceorientation", e => {
+        deviceOrientation.beta = e.beta;
+        deviceOrientation.gamma = e.gamma;
+      });
+      useDeviceOrientation = true;
+    }
+    
+    /* ========= Toolbar Counters ========= */
+    let springCount = 0;
+    let gearCount = 0;
+    let magnetCount = 0;
+    let lampCount = 0;
+    let glowTimers = {
+      spring: null,
+      magnet: null,
+      lamp: null,
+      gear: null
+    };
+    
+    function addGlowEffect(iconId) {
+      const icon = document.getElementById(iconId);
+      if (icon) {
+        icon.classList.add("glow-effect");
+        if (glowTimers[iconId.split('-')[1]]) {
+          clearTimeout(glowTimers[iconId.split('-')[1]]);
+        }
+        glowTimers[iconId.split('-')[1]] = setTimeout(() => {
+          icon.classList.remove("glow-effect");
+        }, 3000);
+      }
+    }
+    
+    function updateCounterColor(countElement, count) {
+      const ratio = Math.min(count / 50, 1);
+      const red = Math.floor(ratio * 255);
+      const green = Math.floor((1 - ratio) * 255);
+      const blue = 0;
+      countElement.style.background = `linear-gradient(45deg, rgb(${red}, ${green}, ${blue}), #0ff)`;
+      countElement.style.color = ratio > 0.5 ? '#fff' : '#000';
+    }
+    
+    function updateToolbarCounts() {
+      document.getElementById("count-spring").textContent = springCount;
+      document.getElementById("count-gear").textContent = gearCount;
+      document.getElementById("count-magnet").textContent = magnetCount;
+      document.getElementById("count-lamp").textContent = lampCount;
+      
+      updateCounterColor(document.getElementById("icon-spring"), springCount);
+      updateCounterColor(document.getElementById("icon-magnet"), magnetCount);
+      updateCounterColor(document.getElementById("icon-lamp"), lampCount);
+      updateCounterColor(document.getElementById("icon-gear"), gearCount);
+      
+      const counters = document.querySelectorAll('.counter-number');
+      counters.forEach(counter => {
+        counter.classList.add('cyber-counter');
+        setTimeout(() => {
+          counter.classList.remove('cyber-counter');
+        }, 500);
+      });
+      
+      if (springCount > 0 && springCount % 5 === 0) addGlowEffect("icon-spring");
+      if (magnetCount > 0 && magnetCount % 5 === 0) addGlowEffect("icon-magnet");
+      if (lampCount > 0 && lampCount % 5 === 0) addGlowEffect("icon-lamp");
+      if (gearCount > 0 && gearCount % 5 === 0) addGlowEffect("icon-gear");
+    }
+    
+    function createElectronicComponent() {
+      const componentType = componentOrder[currentComponentIndex];
+      componentCounts[componentType]++;
+      
+      const countElement = componentIcons[componentType].querySelector('.component-count');
+      if (countElement) {
+        countElement.textContent = componentCounts[componentType];
+        updateCounterColor(countElement, componentCounts[componentType]);
+      }
+      
+      if (componentCounts[componentType] >= 1) {
+        componentIcons[componentType].classList.add("active");
+      }
+      
+      // חלקיקי חגיגה
+      for (let i = 0; i < 50; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2 + Math.random() * 6;
+        explosionParticles.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: 4 + Math.random() * 8,
+          life: 60 + Math.random() * 60,
+          hue: Math.random() * 360
+        });
+      }
+      
+      currentComponentIndex = (currentComponentIndex + 1) % componentOrder.length;
+      
+      checkAllComponentsCompleted();
+      return true;
+    }
+    
+    function checkAllComponentsCompleted() {
+      allComponentsCompleted = (
+        componentCounts.digitalBoard >= 1 &&
+        componentCounts.electricMotor >= 1 &&
+        componentCounts.fanPropeller >= 1 &&
+        componentCounts.electricWires >= 1
+      );
+      if (allComponentsCompleted) {
+        componentIcons.droneIcon.style.display = "flex";
+        componentIcons.droneIcon.classList.add("visible");
+        componentIcons.droneIcon.classList.add("active");
+      }
+    }
+    
+    function updateGlobalComponentCounts() {
+      let currentSpring = 0, currentMagnet = 0, currentLamp = 0, currentGear = 0;
+      for (const jelly of jellyfishes) {
+        if (jelly.componentType === "spring") {
+          currentSpring += jelly.componentCount;
+        } else if (jelly.componentType === "magnet") {
+          currentMagnet += jelly.componentCount;
+        } else if (jelly.componentType === "lamp") {
+          currentLamp += jelly.componentCount;
+        } else if (jelly.componentType === "gear") {
+          currentGear += jelly.componentCount;
+        }
+      }
+      springCount = globalSpring + currentSpring;
+      magnetCount = globalMagnet + currentMagnet;
+      lampCount = globalLamp + currentLamp;
+      gearCount = globalGear + currentGear;
+      
+      if (springCount >= 50 && magnetCount >= 50 && lampCount >= 50 && gearCount >= 50) {
+        const componentsToAdd = Math.min(
+          Math.floor(springCount / 50),
+          Math.floor(magnetCount / 50),
+          Math.floor(lampCount / 50),
+          Math.floor(gearCount / 50)
+        );
+        
+        if (componentsToAdd > 0) {
+          globalSpring -= componentsToAdd * 50;
+          globalMagnet -= componentsToAdd * 50;
+          globalLamp -= componentsToAdd * 50;
+          globalGear -= componentsToAdd * 50;
+          
+          for (let i = 0; i < componentsToAdd; i++) {
+            createElectronicComponent();
+          }
+        }
+      }
+      updateToolbarCounts();
+    }
+    
+    const titleState = {
+      letters: ["C","L","A","Y","T","R","O","N","I","X"],
+      activated: [false,false,false,false,false,false,false,false,false,false],
+      activationThreshold: 3,
+      communicationCount: 0
+    };
+    function activateLetter(index) {
+      if (index >= 0 && index < titleLetters.length) {
+        const letter = titleLetters[index];
+        letter.style.color = `hsla(${Math.random() * 360}, 100%, 70%, 0.9)`;
+        letter.style.textShadow = "0 0 15px rgba(0,255,255,0.7)";
+        letter.animate([
+          { transform: "scale(1)", opacity: 0.1 },
+          { transform: "scale(1.3)", opacity: 0.9 },
+          { transform: "scale(1)", opacity: 0.9 }
+        ], { duration: 800, easing: "ease-out" });
+      }
+    }
+    
+    class Jellyfish {
+      constructor(x, y) {
+        this.x = (x !== undefined) ? x : Math.random() * canvas.width;
+        this.y = (y !== undefined) ? y : Math.random() * canvas.height;
+        this.size = Math.min(canvas.width, canvas.height) * (0.15 + Math.random() * 0.15);
+        this.tentacles = 8 + Math.floor(Math.random() * 8);
+        this.tentacleLength = 0.5 + Math.random() * 0.5;
+        this.tentacleWaveSpeed = 0.003 + Math.random() * 0.005;
+        this.tentacleWaveSize = 0.2 + Math.random() * 0.3;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.targetRotation = this.rotation;
+        this.hue = Math.random() * 360;
+        this.pulseSpeed = 0.01 + Math.random() * 0.02;
+        this.pulseSize = 1;
+        this.speed = 0;
+        this.maxSpeed = 3 + Math.random() * 2;
+        this.isControlled = false;
+        
+        this.particles = [];
+        this.components = [];
+        this.tentacleParticles = [];
+        this.maxParticles = 20 + Math.floor(Math.random() * 20);
+        this.maxComponents = 3 + Math.floor(Math.random() * 5);
+        this.maxTentacleParticles = 50;
+        
+        this.communicationTimer = 0;
+        this.communicationActive = false;
+        this.communicationTarget = null;
+        this.sparks = [];
+        this.dataParticles = [];
+        this.lastTouchTime = 0;
+        
+        this.componentType = ["spring", "magnet", "lamp", "gear"][Math.floor(Math.random() * 4)];
+        this.componentCount = 0;
+        
+        this.mindMapOpen = false;
+        this.nodePositions = [];
+        
+        // Code display
+        this.codeDisplay = null;
+        this.codeText = "";
+        this.createCodeDisplay();
+        this.codeContributionTimer = 0;
+      }
+      
+      createCodeDisplay() {
+        this.codeDisplay = document.createElement('div');
+        this.codeDisplay.className = 'code-display';
+        document.body.appendChild(this.codeDisplay);
+        this.updateCodeText();
+      }
+      
+      updateCodeText() {
+        this.codeText = `Jellyfish {
+  x: ${this.x.toFixed(1)},
+  y: ${this.y.toFixed(1)},
+  type: ${this.componentType},
+  count: ${this.componentCount},
+  speed: ${this.speed.toFixed(2)},
+  hue: ${Math.floor(this.hue)}
+}`;
+        if (this.codeDisplay) {
+          this.codeDisplay.textContent = this.codeText;
+        }
+      }
+      
+      update(targetX, targetY, useOrientation, orientationData, allJellies) {
+        let dx = 0, dy = 0;
+        
+        if (this.isControlled) {
+          dx = (targetX - this.x) * 0.1;
+          dy = (targetY - this.y) * 0.1;
+          this.targetRotation = Math.atan2(dy, dx) + Math.PI / 2;
+          if (Date.now() - this.lastTouchTime < 100 && Math.random() > 0.5) {
+            this.createParticle();
+          }
+        }
+        else if (useOrientation) {
+          dx += (orientationData.gamma || 0) * 0.5;
+          dy += (orientationData.beta || 0) * 0.5;
+          if (dx !== 0 || dy !== 0) {
+            this.targetRotation = Math.atan2(dy, dx) + Math.PI / 2;
+          }
+        }
+        else {
+          this.targetRotation += (Math.random() - 0.5) * 0.1;
+          dx = Math.cos(this.targetRotation - Math.PI / 2) * this.maxSpeed * 0.1;
+          dy = Math.sin(this.targetRotation - Math.PI / 2) * this.maxSpeed * 0.1;
+        }
+        
+        this.rotation += (this.targetRotation - this.rotation) * 0.05;
+        this.speed = Math.sqrt(dx * dx + dy * dy);
+        if (this.speed > this.maxSpeed) {
+          dx = dx * this.maxSpeed / this.speed;
+          dy = dy * this.maxSpeed / this.speed;
+        }
+        this.x += dx;
+        this.y += dy;
+        
+        const margin = this.size;
+        this.x = Math.max(margin, Math.min(canvas.width - margin, this.x));
+        this.y = Math.max(margin, Math.min(canvas.height - margin, this.y));
+        
+        this.checkCollisions(allJellies);
+        
+        if (this.communicationActive) {
+          this.communicationTimer++;
+          if (this.communicationTimer % 10 === 0 && this.communicationTarget) {
+            this.createDataParticle(this.communicationTarget);
+          }
+          if (this.communicationTimer > 120) {
+            this.communicationActive = false;
+            this.communicationTarget = null;
+            titleState.communicationCount++;
+            if (titleState.communicationCount % titleState.activationThreshold === 0) {
+              const next = titleState.activated.findIndex(a => !a);
+              if (next !== -1) {
+                titleState.activated[next] = true;
+                activateLetter(next);
+              }
+            }
+          }
+        }
+        
+        this.updateSparks();
+        this.updateDataParticles();
+        
+        const pulseFactor = this.communicationActive ? 1.5 : 1;
+        this.pulseSize = 0.8 + Math.sin(Date.now() * this.pulseSpeed * pulseFactor) * 0.2;
+        const hueSpeed = this.communicationActive ? 0.3 : 0.1;
+        this.hue = (this.hue + hueSpeed) % 360;
+        
+        if (Math.random() < 0.1) this.createParticle();
+        if (Math.random() < 0.005) this.createComponent();
+        if (Math.random() < 0.2) this.createTentacleParticle();
+        
+        this.updateParticles();
+        this.updateComponents();
+        this.updateTentacleParticles();
+        
+        if (this.mindMapOpen) {
+          const radius = this.size + 20;
+          const nodeX = this.x + radius;
+          const nodeY = this.y;
+          this.nodePositions = [{ x: nodeX, y: nodeY }];
+        }
+        
+        this.updateCodeText();
+        if (this.codeDisplay) {
+          this.codeDisplay.style.left = (this.x + this.size + 25) + 'px';
+          this.codeDisplay.style.top = (this.y - 30) + 'px';
+          this.codeDisplay.style.display = this.mindMapOpen ? 'block' : 'none';
+        }
+        
+        this.codeContributionTimer++;
+        if (this.codeContributionTimer % 60 === 0) {
+          checkForCodeCollaboration();
+        }
+      }
+      
+      checkCollisions(allJellies) {
+        for (const other of allJellies) {
+          if (other === this) continue;
+          const dx = other.x - this.x;
+          const dy = other.y - this.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const minDist = (this.size + other.size) * 0.7;
+          if (dist < minDist) {
+            if (this.componentType === other.componentType) {
+              this.hue = Math.random() * 360;
+              other.hue = Math.random() * 360;
+              for (let i = 0; i < 3; i++) {
+                this.createSpark();
+                other.createSpark();
+              }
+              if (!this.communicationActive && !other.communicationActive) {
+                this.startCommunication(other);
+                other.startCommunication(this);
+              }
+            }
+            const angle = Math.atan2(dy, dx);
+            const force = 0.5;
+            this.x -= Math.cos(angle) * force;
+            this.y -= Math.sin(angle) * force;
+            other.x += Math.cos(angle) * force;
+            other.y += Math.sin(angle) * force;
+          }
+        }
+      }
+      
+      startCommunication(targetJelly) {
+        this.communicationActive = true;
+        this.communicationTimer = 0;
+        this.communicationTarget = targetJelly;
+        this.componentCount++;
+        this.isHappy = true;
+        this.happyUntil = Date.now() + 500;
+        for (let i = 0; i < 5; i++) {
+          this.createSpark();
+        }
+      }
+      
+      createDataParticle(targetJelly) {
+        if (!targetJelly) return;
+        const startX = this.x;
+        const startY = this.y;
+        const endX = targetJelly.x;
+        const endY = targetJelly.y;
+        this.dataParticles.push({
+          x: startX,
+          y: startY,
+          startX,
+          startY,
+          endX,
+          endY,
+          progress: 0,
+          speed: 0.02 + Math.random() * 0.03,
+          size: 2 + Math.random() * 3,
+          hue: (this.hue + Math.random() * 60 - 30) % 360,
+          life: 100
+        });
+      }
+      
+      updateDataParticles() {
+        for (let i = this.dataParticles.length - 1; i >= 0; i--) {
+          const p = this.dataParticles[i];
+          p.progress += p.speed;
+          p.life--;
+          if (p.progress >= 1 || p.life <= 0) {
+            this.dataParticles.splice(i, 1);
+            continue;
+          }
+          p.x = p.startX + (p.endX - p.startX) * p.progress;
+          p.y = p.startY + (p.endY - p.startY) * p.progress;
+          const angle = Math.atan2(p.endY - p.startY, p.endX - p.startX);
+          const perp = angle + Math.PI / 2;
+          const wave = 5 * Math.sin(p.progress * Math.PI);
+          p.x += Math.cos(perp) * wave * (0.5 - Math.random());
+          p.y += Math.sin(perp) * wave * (0.5 - Math.random());
+        }
+      }
+      
+      createSpark() {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.5 + Math.random() * 2;
+        this.sparks.push({
+          x: this.x,
+          y: this.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: 1 + Math.random() * 2,
+          life: 60,
+          hue: (this.hue + Math.random() * 60 - 30) % 360
+        });
+      }
+      
+      updateSparks() {
+        for (let i = this.sparks.length - 1; i >= 0; i--) {
+          const s = this.sparks[i];
+          s.x += s.vx;
+          s.y += s.vy;
+          s.life--;
+          if (s.life <= 0) this.sparks.splice(i, 1);
+        }
+      }
+      
+      createTentacleParticle() {
+        if (this.tentacleParticles.length >= this.maxTentacleParticles) return;
+        const tentacleIndex = Math.floor(Math.random() * this.tentacles);
+        const progress = 0.1 + Math.random() * 0.8;
+        const angle = (tentacleIndex / this.tentacles) * Math.PI * 2;
+        const wave = Math.sin(Date.now() * this.tentacleWaveSpeed + tentacleIndex * 0.5) * this.tentacleWaveSize;
+        const tLength = this.size * this.tentacleLength;
+        const cp1x = Math.cos(angle + wave) * this.size * 0.3;
+        const cp1y = Math.sin(angle + wave) * this.size * 0.3 + tLength * 0.3;
+        const cp2x = Math.cos(angle - wave * 0.5) * this.size * 0.2;
+        const cp2y = Math.sin(angle - wave * 0.5) * this.size * 0.2 + tLength * 0.6;
+        const endX = Math.cos(angle) * this.size * 0.1;
+        const endY = tLength;
+        const point = this.getPointOnBezier(0, 0, cp1x, cp1y, cp2x, cp2y, endX, endY, progress);
+        this.tentacleParticles.push({
+          x: this.x + point.x,
+          y: this.y + point.y,
+          size: 1 + Math.random() * 1.5,
+          hue: (this.hue + Math.random() * 40 - 20) % 360,
+          life: 20 + Math.random() * 30,
+          maxLife: 20 + Math.random() * 30,
+          angle,
+          progress,
+          tentacleIndex
+        });
+      }
+      
+      updateTentacleParticles() {
+        for (let i = this.tentacleParticles.length - 1; i >= 0; i--) {
+          const p = this.tentacleParticles[i];
+          p.life--;
+          if (p.life <= 0) {
+            this.tentacleParticles.splice(i, 1);
+            continue;
+          }
+          const wave = Math.sin(Date.now() * this.tentacleWaveSpeed + p.tentacleIndex * 0.5) * this.tentacleWaveSize;
+          const tLength = this.size * this.tentacleLength;
+          const cp1x = Math.cos(p.angle + wave) * this.size * 0.3;
+          const cp1y = Math.sin(p.angle + wave) * this.size * 0.3 + tLength * 0.3;
+          const cp2x = Math.cos(p.angle - wave * 0.5) * this.size * 0.2;
+          const cp2y = Math.sin(p.angle - wave * 0.5) * this.size * 0.2 + tLength * 0.6;
+          const endX = Math.cos(p.angle) * this.size * 0.1;
+          const endY = tLength;
+          const point = this.getPointOnBezier(0, 0, cp1x, cp1y, cp2x, cp2y, endX, endY, p.progress);
+          p.x = this.x + point.x;
+          p.y = this.y + point.y;
+        }
+      }
+      
+      getPointOnBezier(p0x, p0y, p1x, p1y, p2x, p2y, p3x, p3y, t) {
+        const mt = 1 - t;
+        const mt2 = mt * mt;
+        const t2 = t * t;
+        const a = mt2 * mt;
+        const b = mt2 * t * 3;
+        const c = mt * t2 * 3;
+        const d = t * t2;
+        return {
+          x: a * p0x + b * p1x + c * p2x + d * p3x,
+          y: a * p0y + b * p1y + c * p2y + d * p3y
+        };
+      }
+      
+      createParticle() {
+        if (this.particles.length >= this.maxParticles) return;
+        const angle = Math.random() * Math.PI * 2;
+        const distance = this.size * (0.3 + Math.random() * 0.7);
+        const speed = 0.3 + Math.random() * 1.5;
+        this.particles.push({
+          x: this.x + Math.cos(angle) * distance,
+          y: this.y + Math.sin(angle) * distance,
+          size: 1 + Math.random() * 3,
+          hue: (this.hue + Math.random() * 60 - 30) % 360,
+          speed,
+          angle,
+          distance,
+          life: 30 + Math.random() * 100,
+          maxLife: 30 + Math.random() * 100,
+          type: Math.random() > 0.8 ? "circuit" : "particle"
+        });
+      }
+      
+      updateParticles() {
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+          const p = this.particles[i];
+          p.angle += 0.01 / p.speed;
+          p.x = this.x + Math.cos(p.angle) * p.distance;
+          p.y = this.y + Math.sin(p.angle) * p.distance;
+          p.life--;
+          if (p.life <= 0) this.particles.splice(i, 1);
+        }
+      }
+      
+      createComponent() {
+        if (this.components.length >= this.maxComponents) return;
+        const angle = Math.random() * Math.PI * 2;
+        const distance = this.size * (0.4 + Math.random() * 0.6);
+        this.components.push({
+          x: this.x + Math.cos(angle) * distance,
+          y: this.y + Math.sin(angle) * distance,
+          size: 3 + Math.random() * 10,
+          hue: (this.hue + Math.random() * 40 - 20) % 360,
+          angle,
+          distance,
+          speed: 0.03 + Math.random() * 0.1,
+          type: ["chip", "resistor", "capacitor", "node"][Math.floor(Math.random() * 4)]
+        });
+      }
+      
+      updateComponents() {
+        for (let i = 0; i < this.components.length; i++) {
+          const c = this.components[i];
+          c.angle += c.speed * 0.01;
+          c.x = this.x + Math.cos(c.angle) * c.distance;
+          c.y = this.y + Math.sin(c.angle) * c.distance;
+        }
+      }
+      
+      draw() {
+        const size = this.size * this.pulseSize;
+        
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        
+        ctx.beginPath();
+        ctx.ellipse(0, -size * 0.2, size * 0.5, size * 0.3, 0, 0, Math.PI * 2);
+        const gradient = ctx.createRadialGradient(0, -size * 0.2, 0, 0, -size * 0.2, size * 0.5);
+        if (this.communicationActive) {
+          gradient.addColorStop(0, `hsla(${this.hue},100%,90%,0.8)`);
+          gradient.addColorStop(0.5, `hsla(${(this.hue+60)%360},100%,80%,0.6)`);
+          gradient.addColorStop(1, `hsla(${(this.hue+120)%360},100%,70%,0.3)`);
+        } else {
+          gradient.addColorStop(0, `hsla(${this.hue},100%,70%,${this.isControlled ? 0.7 : 0.5})`);
+          gradient.addColorStop(1, `hsla(${(this.hue+30)%360},100%,50%,${this.isControlled ? 0.2 : 0.1})`);
+        }
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        for (let i = 0; i < this.tentacles; i++) {
+          const angle = (i / this.tentacles) * Math.PI * 2;
+          const tLength = size * this.tentacleLength;
+          const wave = Math.sin(Date.now() * this.tentacleWaveSpeed + i * 0.5) * this.tentacleWaveSize;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          const cp1x = Math.cos(angle + wave) * size * 0.3;
+          const cp1y = Math.sin(angle + wave) * size * 0.3 + tLength * 0.3;
+          const cp2x = Math.cos(angle - wave * 0.5) * size * 0.2;
+          const cp2y = Math.sin(angle - wave * 0.5) * size * 0.2 + tLength * 0.6;
+          const endX = Math.cos(angle) * size * 0.1;
+          const endY = tLength;
+          ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
+          const tGradient = ctx.createLinearGradient(0, 0, endX, endY);
+          if (this.communicationActive) {
+            tGradient.addColorStop(0, `hsla(${this.hue},100%,90%,0.7)`);
+            tGradient.addColorStop(1, `hsla(${(this.hue+90)%360},100%,80%,0.4)`);
+          } else {
+            tGradient.addColorStop(0, `hsla(${this.hue},100%,70%,${this.isControlled ? 0.5 : 0.3})`);
+            tGradient.addColorStop(1, `hsla(${(this.hue+40)%360},100%,50%,${this.isControlled ? 0.1 : 0.05})`);
+          }
+          ctx.strokeStyle = tGradient;
+          ctx.lineWidth = this.isControlled ? 3 : 1.5;
+          if (this.communicationActive) ctx.lineWidth += 0.5;
+          ctx.lineCap = "round";
+          ctx.stroke();
+        }
+        
+        ctx.restore();
+        
+        if (this.mindMapOpen) {
+          const radius = this.size + 20;
+          let nodeIcon;
+          switch(this.componentType) {
+            case "spring": nodeIcon = "🌀"; break;
+            case "magnet": nodeIcon = "🧲"; break;
+            case "lamp": nodeIcon = "💡"; break;
+            case "gear": nodeIcon = "⚙"; break;
+          }
+          const nodeX = this.x + radius;
+          const nodeY = this.y;
+          this.nodePositions = [{ x: nodeX, y: nodeY }];
+          ctx.beginPath();
+          ctx.moveTo(this.x, this.y);
+          ctx.lineTo(nodeX, nodeY);
+          ctx.strokeStyle = "rgba(0,255,255,0.5)";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.arc(nodeX, nodeY, 10, 0, 2*Math.PI);
+          const nodeGrad = ctx.createRadialGradient(nodeX, nodeY, 0, nodeX, nodeY, 10);
+          nodeGrad.addColorStop(0, "rgba(0,255,255,1)");
+          nodeGrad.addColorStop(1, "rgba(0,255,255,0)");
+          ctx.fillStyle = nodeGrad;
+          ctx.fill();
+          
+          ctx.fillStyle = "#000";
+          ctx.font = "bold 14px Arial";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(nodeIcon, nodeX, nodeY);
+          
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 10px Arial";
+          ctx.fillText(this.componentCount, nodeX, nodeY + 15);
+        }
+        
+        // Data, sparks, tentacle particles, etc.
+        for (const p of this.dataParticles) {
+          const alpha = Math.min(p.progress, 1 - p.progress)*2;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+          const dataGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+          dataGrad.addColorStop(0, `hsla(${p.hue},100%,80%,${alpha})`);
+          dataGrad.addColorStop(0.7, `hsla(${(p.hue+60)%360},100%,70%,${alpha*0.7})`);
+          dataGrad.addColorStop(1, `hsla(${(p.hue+120)%360},100%,60%,0)`);
+          ctx.fillStyle = dataGrad;
+          ctx.fill();
+        }
+        
+        for (const p of this.tentacleParticles) {
+          const alpha = p.life / p.maxLife * 0.6;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+          ctx.fillStyle = `hsla(${p.hue},100%,70%,${alpha})`;
+          ctx.fill();
+        }
+        
+        for (const spark of this.sparks) {
+          const alpha = spark.life / 60;
+          ctx.beginPath();
+          ctx.arc(spark.x, spark.y, spark.size, 0, Math.PI*2);
+          ctx.fillStyle = `hsla(${spark.hue},100%,80%,${alpha})`;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(spark.x, spark.y);
+          ctx.lineTo(spark.x - spark.vx, spark.y - spark.vy);
+          ctx.strokeStyle = `hsla(${spark.hue},100%,70%,${alpha*0.6})`;
+          ctx.lineWidth = spark.size*0.5;
+          ctx.stroke();
+        }
+        
+        for (const p of this.particles) {
+          const alpha = p.life / p.maxLife * 0.7;
+          if (p.type === "circuit") {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size*0.5, 0, Math.PI*2);
+            ctx.fillStyle = `hsla(${p.hue},100%,70%,${alpha})`;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size*0.3, 0, Math.PI*2);
+            ctx.strokeStyle = `hsla(${(p.hue+60)%360},100%,80%,${alpha})`;
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          } else {
+            const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+            glow.addColorStop(0, `hsla(${p.hue},100%,80%,${alpha})`);
+            glow.addColorStop(1, `hsla(${p.hue},100%,50%,0)`);
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+            ctx.fill();
+          }
+        }
+        
+        for (const c of this.components) {
+          ctx.save();
+          ctx.translate(c.x - this.x, c.y - this.y);
+          ctx.rotate(c.angle * 2);
+          ctx.fillStyle = `hsla(${c.hue},100%,60%,0.5)`;
+          ctx.strokeStyle = `hsla(${(c.hue+60)%360},100%,80%,0.7)`;
+          ctx.lineWidth = 1;
+          switch(c.type) {
+            case "chip":
+              ctx.beginPath();
+              ctx.rect(-c.size*0.5, -c.size*0.3, c.size, c.size*0.6);
+              ctx.fill();
+              ctx.stroke();
+              for (let j=0;j<4;j++){
+                ctx.beginPath();
+                ctx.rect(-c.size*0.5-1.5, -c.size*0.3 + j*(c.size*0.6/3), 1.5, 1);
+                ctx.rect(c.size*0.5, -c.size*0.3 + j*(c.size*0.6/3), 1.5, 1);
+                ctx.fill();
+              }
+              break;
+            case "resistor":
+              ctx.beginPath();
+              ctx.rect(-c.size*0.4, -c.size*0.1, c.size*0.8, c.size*0.2);
+              ctx.fill();
+              ctx.stroke();
+              for (let j=0;j<3;j++){
+                ctx.fillStyle = `hsl(${Math.random()*360},100%,50%)`;
+                ctx.beginPath();
+                ctx.rect(-c.size*0.3 + j*(c.size*0.6/2), -c.size*0.1, c.size*0.6/3, c.size*0.2);
+                ctx.fill();
+              }
+              break;
+            case "capacitor":
+              ctx.beginPath();
+              ctx.rect(-c.size*0.4, -c.size*0.15, c.size*0.15, c.size*0.3);
+              ctx.rect(c.size*0.25, -c.size*0.15, c.size*0.15, c.size*0.3);
+              ctx.fill();
+              ctx.stroke();
+              break;
+            case "node":
+              ctx.beginPath();
+              ctx.arc(0,0,c.size*0.15,0,2*Math.PI);
+              ctx.fill();
+              for (let j=0;j<3;j++){
+                const a = j * Math.PI*2/3 + Math.random()*0.5;
+                ctx.beginPath();
+                ctx.moveTo(0,0);
+                ctx.lineTo(Math.cos(a)*c.size*0.3,Math.sin(a)*c.size*0.3);
+                ctx.stroke();
+              }
+              break;
+          }
+          ctx.restore();
+        }
+      }
+    }
+    
+    // רשימת מדוזות
+    const jellyfishes = [];
+    const firstJelly = new Jellyfish(canvas.width/2, canvas.height/2);
+    firstJelly.isControlled = true;
+    controlledJellyfish = firstJelly;
+    jellyfishes.push(firstJelly);
+    
+    function removeJellyfish(jelly) {
+      if (jelly.componentType === "spring") globalSpring += jelly.componentCount;
+      else if (jelly.componentType === "magnet") globalMagnet += jelly.componentCount;
+      else if (jelly.componentType === "lamp") globalLamp += jelly.componentCount;
+      else if (jelly.componentType === "gear") globalGear += jelly.componentCount;
+      
+      updateGlobalComponentCounts();
+      spawnExplosion(jelly.x, jelly.y, jelly.size, jelly.hue);
+      const idx = jellyfishes.indexOf(jelly);
+      if (idx!==-1) {
+        if (jelly.codeDisplay && jelly.codeDisplay.parentNode) {
+          jelly.codeDisplay.parentNode.removeChild(jelly.codeDisplay);
+        }
+        jellyfishes.splice(idx,1);
+      }
+      if (jelly.isControlled && jellyfishes.length>0){
+        controlledJellyfish = jellyfishes[0];
+        controlledJellyfish.isControlled = true;
+      }
+    }
+    
+    function spawnExplosion(cx, cy, baseSize, hue){
+      const count = 30;
+      for (let i=0;i<count;i++){
+        const angle = Math.random()*Math.PI*2;
+        const speed = 2+Math.random()*4;
+        explosionParticles.push({
+          x:cx,
+          y:cy,
+          vx:Math.cos(angle)*speed,
+          vy:Math.sin(angle)*speed,
+          size:4+Math.random()*8,
+          life:30+Math.random()*15,
+          hue:(hue+Math.random()*60-30)%360
+        });
+      }
+    }
+    
+    function handleDoubleClick(e){
+      const rect = canvas.getBoundingClientRect();
+      let x=e.clientX-rect.left, y=e.clientY-rect.top;
+      if (e.touches && e.touches.length>0){
+        x=e.touches[0].clientX - rect.left;
+        y=e.touches[0].clientY - rect.top;
+      }
+      let clicked=null;
+      for(const jelly of jellyfishes){
+        const d = Math.sqrt((x-jelly.x)**2 + (y-jelly.y)**2);
+        if (d<jelly.size){
+          clicked=jelly;
+          break;
+        }
+      }
+      if(clicked){
+        clicked.mindMapOpen=!clicked.mindMapOpen;
+      } else {
+        const newJelly=new Jellyfish(x,y);
+        jellyfishes.push(newJelly);
+      }
+    }
+    
+    function drawMindMapConnections(){
+      const openJellies = jellyfishes.filter(j=>j.mindMapOpen && j.nodePositions.length===1);
+      for(let i=0;i<openJellies.length;i++){
+        for(let j=i+1;j<openJellies.length;j++){
+          if(openJellies[i].componentType===openJellies[j].componentType){
+            const pos1=openJellies[i].nodePositions[0];
+            const pos2=openJellies[j].nodePositions[0];
+            ctx.beginPath();
+            ctx.moveTo(pos1.x,pos1.y);
+            ctx.lineTo(pos2.x,pos2.y);
+            ctx.strokeStyle = 'rgba(255,0,255,0.8)';
+            ctx.lineWidth=2;
+            ctx.stroke();
+          }
+        }
+      }
+    }
+    
+    let lastTapTime=0, lastTapX=0, lastTapY=0;
+    canvas.addEventListener('touchend',function(e){
+      const currentTime=Date.now();
+      const tapLength=currentTime-lastTapTime;
+      const rect=canvas.getBoundingClientRect();
+      const x=e.changedTouches[0].clientX-rect.left;
+      const y=e.changedTouches[0].clientY-rect.top;
+      if(tapLength<300 && Math.abs(x-lastTapX)<30 && Math.abs(y-lastTapY)<30){
+        handleDoubleClick({clientX:x+rect.left, clientY:y+rect.top});
+        lastTapTime=0;
+      } else {
+        lastTapTime=currentTime;
+        lastTapX=x;
+        lastTapY=y;
+      }
+    });
+    
+    canvas.addEventListener('dblclick', handleDoubleClick);
+    
+    canvas.addEventListener('mousedown', handleStart);
+    canvas.addEventListener('mousemove', handleMove);
+    canvas.addEventListener('mouseup', handleEnd);
+    canvas.addEventListener('touchstart', handleStart, {passive:false});
+    canvas.addEventListener('touchmove', handleMove, {passive:false});
+    canvas.addEventListener('touchend', handleEnd);
+    
+    function handleStart(e){
+      isInteracting=true;
+      updateTarget(e);
+      
+      // בודקים אם לחצו בכפתור אמצע (button === 1)
+      if(!e.touches && e.button === 1) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const newJelly = new Jellyfish(x,y);
+        jellyfishes.push(newJelly);
+        
+        // מונעים גלילת דפדפן או תפריט דפדפן
+        if(e.cancelable) e.preventDefault();
+        return;
+      }
+      
+      const rect=canvas.getBoundingClientRect();
+      const xVal=e.touches ? e.touches[0].clientX-rect.left : e.clientX-rect.left;
+      const yVal=e.touches ? e.touches[0].clientY-rect.top : e.clientY-rect.top;
+      pressStartX=xVal;
+      pressStartY=yVal;
+      
+      let closest=null, minDist=Infinity;
+      for(const jelly of jellyfishes){
+        const d=Math.sqrt((xVal-jelly.x)**2 + (yVal-jelly.y)**2);
+        if(d<minDist && d<jelly.size*2){
+          minDist=d;closest=jelly;
+        }
+      }
+      if(closest){
+        if(controlledJellyfish){
+          controlledJellyfish.isControlled=false;
+        }
+        controlledJellyfish=closest;
+        controlledJellyfish.isControlled=true;
+        controlledJellyfish.lastTouchTime=Date.now();
+        for(let i=0;i<5;i++){
+          controlledJellyfish.createParticle();
+        }
+        
+        // לחיצה ארוכה
+        longPressTimer=setTimeout(()=>{
+          removeJellyfish(closest);
+          longPressTimer=null;
+        },1000);
+      }
+      if(e.cancelable) e.preventDefault();
+    }
+    
+    function handleMove(e){
+      if(isInteracting){
+        updateTarget(e);
+        if(longPressTimer){
+          const rect=canvas.getBoundingClientRect();
+          let cx,cy;
+          if(e.touches){
+            cx=e.touches[0].clientX-rect.left;
+            cy=e.touches[0].clientY-rect.top;
+          } else {
+            cx=e.clientX-rect.left;
+            cy=e.clientY-rect.top;
+          }
+          const dx=cx-pressStartX, dy=cy-pressStartY;
+          if(Math.sqrt(dx*dx+dy*dy)>10){
+            clearTimeout(longPressTimer);
+            longPressTimer=null;
+          }
+        }
+        if(e.cancelable) e.preventDefault();
+      }
+    }
+    
+    function handleEnd(){
+      isInteracting=false;
+      if(longPressTimer){
+        clearTimeout(longPressTimer);
+        longPressTimer=null;
+      }
+    }
+    
+    function updateTarget(e){
+      const rect=canvas.getBoundingClientRect();
+      if(e.touches && e.touches.length>0){
+        targetX=e.touches[0].clientX-rect.left;
+        targetY=e.touches[0].clientY-rect.top;
+      } else {
+        targetX=e.clientX-rect.left;
+        targetY=e.clientY-rect.top;
+      }
+    }
+    
+    // כפתור מידע
+    infoBtn.addEventListener('click',()=>{
+      if(instructionsDiv.style.display==='none'||instructionsDiv.style.display===''){
+        instructionsDiv.style.display='block';
+      } else {
+        instructionsDiv.style.display='none';
+      }
+    });
+    
+    // כפתור רחפן
+    componentIcons.droneIcon.addEventListener('click',()=>{
+      if(!allComponentsCompleted) return;
+      
+      for(let i=0;i<30;i++){
+        const angle=Math.random()*Math.PI*2;
+        const speed=2+Math.random()*4;
+        explosionParticles.push({
+          x:componentIcons.droneIcon.getBoundingClientRect().left+40,
+          y:componentIcons.droneIcon.getBoundingClientRect().top+40,
+          vx:Math.cos(angle)*speed,
+          vy:Math.sin(angle)*speed,
+          size:4+Math.random()*8,
+          life:30+Math.random()*15,
+          hue:Math.random()*360
+        });
+      }
+      
+      alert('מעבר למשחק הרחפן! (כאן תהיה הפנייה למשחק הרחפן).');
+      // window.location.href='drone_game.html';
+    });
+    
+    function animate(){
+      drawPlasmaBackground();
+      
+      for(const jelly of jellyfishes){
+        jelly.update(targetX,targetY,useDeviceOrientation,deviceOrientation,jellyfishes);
+        jelly.draw();
+      }
+      
+      drawMindMapConnections();
+      updateExplosionParticles();
+      drawExplosionParticles();
+      
+      for(let i=jellyfishes.length-1;i>=0;i--){
+        if(jellyfishes[i].componentCount>=20){
+          removeJellyfish(jellyfishes[i]);
+        }
+      }
+      updateGlobalComponentCounts();
+      
+      if(!titleIlluminated){
+        const rect=titleContainer.getBoundingClientRect();
+        for(const jelly of jellyfishes){
+          if(jelly.x>=rect.left && jelly.x<=rect.right && jelly.y>=rect.top && jelly.y<=rect.bottom){
+            triggerTitleIllumination();
+            break;
+          }
+        }
+      }
+      
+      requestAnimationFrame(animate);
+    }
+    animate();
+  </script>
+</body>
+</html>

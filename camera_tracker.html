@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>FishTrack 3D Mobile – Modes & Depth Scaling v4</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    html, body { margin:0; padding:0; height:100vh; overflow:hidden; background:#000; touch-action:none; user-select:none; }
+    video, canvas { position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; }
+    #headerBar { position:fixed; top:8px; width:100%; display:flex; justify-content:space-between; align-items:center; padding:0 8px; z-index:6; }
+    #headerBar button, #headerBar a { font-family:'Press Start 2P',monospace; font-size:12px; color:#0f0; background:rgba(0,0,0,0.5); border:1px solid #0f0; padding:4px; border-radius:4px; text-decoration:none; cursor:pointer; }
+    #modeBar { position:fixed; top:60px; left:50%; transform:translateX(-50%); display:flex; gap:6px; z-index:6; }
+    .modeBtn { font-family:'Press Start 2P',monospace; font-size:10px; color:#0f0; background:rgba(0,0,0,0.5); border:1px solid #0f0; padding:4px; border-radius:4px; cursor:pointer; }
+    .modeBtn.active { background:#0f0; color:#000; }
+    #shapeBar { position:fixed; left:8px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:6px; z-index:6; }
+    .shapeBtn { font-size:22px; color:#0f0; cursor:pointer; text-shadow:0 0 4px #0f0; padding:3px; border-radius:3px; }
+    .shapeBtn.selected { background:rgba(0,255,0,0.2); }
+    #controls { position:fixed; bottom:5%; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; gap:6px; z-index:5; width:90%; }
+    #controls input[type=range] { width:100%; -webkit-appearance:none; height:6px; background:#444; border-radius:3px; }
+    #controls input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:#fff; border:2px solid #ccc; }
+  </style>
+</head>
+<body>
+  <div id="headerBar">
+    <button id="flipBtn">החלפת מצלמה</button>
+    <button id="downloadImage">הורד תמונה</button>
+    <a href="https://orengamchi.com" target="_blank">orengamchi.com</a>
+  </div>
+  <div id="modeBar">
+    <div class="modeBtn active" data-mode="all">הכל</div>
+    <div class="modeBtn" data-mode="line">קו בלבד</div>
+    <div class="modeBtn" data-mode="circles">עיגולים בלבד</div>
+    <div class="modeBtn" data-mode="shapes">צורות בלבד</div>
+    <div class="modeBtn" data-mode="glows">נקודות תאורה</div>
+    <div class="modeBtn" data-mode="particles">חלקיקים</div>
+  </div>
+  <div id="shapeBar"></div>
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="overlay"></canvas>
+  <div id="controls">
+    <input type="range" id="sizeSlider" min="0.5" max="3" step="0.1" value="1"/>
+    <input type="range" id="hueSlider" min="0" max="360" value="0"/>
+  </div>
+
+<script>
+  let facingMode='environment';
+  const REGION=4, THR=10, FRAME_MS=80, MAX_HITS=100;
+  const TRACK_LIFE=1200, PARTICLE_LIFE=1200, GLOW_LIFE=2500, LINE_LIFE=2500;
+  const BASE_PARTICLE_COUNT=3, PARTICLE_RADIUS=1, TRACK_RADIUS=6;
+  const MAX_TRACKS=200, MAX_PARTICLES=150, MAX_GLOWS=40, MAX_LINE=60;
+  const SHAPES=['circle','square','triangle','pentagon','hexagon','star','diamond','octagon','cross','trapezoid','parallelogram'];
+  const ICONS={'circle':'○','square':'■','triangle':'△','pentagon':'⬟','hexagon':'⬢','star':'☆','diamond':'◆','octagon':'⎔','cross':'✚','trapezoid':'▱','parallelogram':'▰'};
+  const SHAPE_INTERVAL=15000, FOV=250, DEPTH_SCALE=6, SMOOTHING=0.3;
+
+  const vid=document.getElementById('video'), ov=document.getElementById('overlay'),
+        ctx=ov.getContext('2d'), off=document.createElement('canvas'), ofctx=off.getContext('2d'),
+        sb=document.getElementById('shapeBar'), mb=document.getElementById('modeBar'),
+        ss=document.getElementById('sizeSlider'), sh=document.getElementById('hueSlider'),
+        flipBtn=document.getElementById('flipBtn'), downloadBtn=document.getElementById('downloadImage');
+
+  let drawMode='all', hueOffset=0, sizeScale=1, manualShape=null, fsRequested=false;
+  let prev=null, last=performance.now(), lastScan=0;
+  const tracks=[], particles=[], glows=[], linePath=[];
+
+  async function startCamera(){
+    if(vid.srcObject) vid.srcObject.getTracks().forEach(t=>t.stop());
+    try { 
+      const s=await navigator.mediaDevices.getUserMedia({video:{facingMode}});
+      vid.srcObject=s; vid.onloadedmetadata=()=>{resize(); vid.play();};
+    } catch(e){alert('שגיאת מצלמה');}
+  }
+  function resize(){ ov.width=vid.videoWidth||innerWidth; ov.height=vid.videoHeight||innerHeight; off.width=ov.width/4; off.height=ov.height/4; }
+  window.addEventListener('resize', resize);
+  flipBtn.onclick = ()=>{ facingMode = facingMode==='environment'?'user':'environment'; startCamera(); };
+  startCamera();
+
+  downloadBtn.onclick = ()=>{
+    const cap=document.createElement('canvas'); cap.width=ov.width; cap.height=ov.height;
+    const cctx=cap.getContext('2d');
+    cctx.drawImage(vid,0,0,cap.width,cap.height);
+    cctx.drawImage(ov,0,0,cap.width,cap.height);
+    cap.toBlob(blob=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='fishtrack.png'; a.click(); });
+  };
+
+  mb.querySelectorAll('.modeBtn').forEach(btn=>btn.onclick=()=>{
+    mb.querySelectorAll('.modeBtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active'); drawMode=btn.dataset.mode;
+  });
+
+  ss.oninput=()=>sizeScale=+ss.value;
+  sh.oninput=()=>hueOffset=+sh.value;
+
+  SHAPES.forEach(shape=>{
+    const b=document.createElement('div');
+    b.className='shapeBtn'; b.textContent=ICONS[shape];
+    b.onclick=()=>{ manualShape=shape; sb.querySelectorAll('.shapeBtn').forEach(x=>x.classList.remove('selected')); b.classList.add('selected'); };
+    sb.appendChild(b);
+  });
+
+  ['pointerdown','pointermove','pointerup'].forEach(ev=>vid.addEventListener(ev,e=>{
+    if(!fsRequested){document.documentElement.requestFullscreen().catch(()=>{});fsRequested=true;}
+    const m={'pointerdown':'mousedown','pointermove':'mousemove','pointerup':'mouseup'}[ev];
+    ov.dispatchEvent(new MouseEvent(m,{clientX:e.clientX,clientY:e.clientY,bubbles:true}));
+  }));
+
+  let tapT=0,tapX=0,tapY=0,drag=null,dx=0,dy=0;
+  ov.addEventListener('mousedown',e=>{
+    const {x,y}=toCanvas(e), now=performance.now();
+    if(now-tapT<300&&Math.hypot(x-tapX,y-tapY)<20){ freeze(x,y); tapT=0; }
+    else{ tapT=now; tapX=x; tapY=y; drag=particles.find(p=>p.persistent&&Math.hypot(p.x-x,p.y-y)<15); if(drag){dx=x-drag.x;dy=y-drag.y;} }
+  });
+  ov.addEventListener('mousemove',e=>{ if(drag){ const{ x,y}=toCanvas(e); drag.x=x-dx; drag.y=y-dy; } });
+  ['mouseup','mouseleave'].forEach(ev=>ov.addEventListener(ev,()=>drag=null));
+  function toCanvas(e){ const r=ov.getBoundingClientRect(); return{ x:(e.clientX-r.left)*(ov.width/r.width), y:(e.clientY-r.top)*(ov.height/r.height) }; }
+  function freeze(x,y){ for(const p of particles) if(Math.hypot(p.x-x,p.y-y)<15){ p.persistent=true; p.vx=p.vy=0; return; } }
+
+  requestAnimationFrame(loop);
+  function loop(t){
+    if(vid.readyState>=2){
+      if(t-lastScan>FRAME_MS){ scan(); lastScan=t; }
+      const dt=(t-last)/16.67; last=t; update(dt); draw(); clean();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  function scan(){
+    ofctx.drawImage(vid,0,0,off.width,off.height);
+    const data=ofctx.getImageData(0,0,off.width,off.height).data;
+    if(prev){
+      const cls=[]; for(let y=0;y<off.height;y+=REGION)for(let x=0;x<off.width;x+=REGION){
+        let diff=0, cnt=0; for(let dy=0;dy<REGION;dy+=2)for(let dx=0;dx<REGION;dx+=2){
+          const i=((y+dy)*off.width+x+dx)*4;
+          diff+=Math.abs(data[i]-prev[i])+Math.abs(data[i+1]-prev[i+1])+Math.abs(data[i+2]-prev[i+2]); cnt++;
+        }
+        if(diff/cnt>THR) cls.push({x,y});
+      }
+      const hits=[]; cls.forEach(p=>{ if(!hits.some(h=>Math.hypot(h.x-p.x,h.y-p.y)<REGION*1.2)) hits.push(p); });
+      hits.slice(0,MAX_HITS).forEach((p,i)=>{
+        const rx=(p.x+REGION/2)*(ov.width/off.width), ry=(p.y+REGION/2)*(ov.height/off.height), birth=Date.now(), z=Math.random()*DEPTH_SCALE;
+        let tr=tracks.find(t=>Math.hypot(t.x-rx,t.y-ry)<TRACK_RADIUS*2);
+        if(tr){
+          tr.measX=rx; tr.measY=ry; tr.measZ=z; tr.birth=birth;
+        } else if(tracks.length<MAX_TRACKS){
+          tracks.push({x:rx,y:ry,z:z,measX:rx,measY:ry,measZ:z,birth:birth});
+        }
+        let count=BASE_PARTICLE_COUNT*(drawMode==='particles'?2:1);
+        for(let j=0;j<count&&particles.length<MAX_PARTICLES;j++){
+          const a=Math.random()*2*Math.PI,s=1+Math.random()*1.1;
+          particles.push({x:rx,y:ry,z:z,vx:Math.cos(a)*s,vy:Math.sin(a)*s,birth:birth,persistent:false});
+        }
+        if(i===0) linePath.push({x:rx,y:ry,z:birth}); // reuse birth field mistakenly but ok
+      });
+      while(linePath.length>MAX_LINE) linePath.shift();
+    }
+    prev=data.slice();
+  }
+
+  function update(dt){
+    const now=Date.now();
+    tracks.forEach(tr=>{
+      tr.x += (tr.measX - tr.x)*SMOOTHING;
+      tr.y += (tr.measY - tr.y)*SMOOTHING;
+      tr.z += (tr.measZ - tr.z)*SMOOTHING;
+    });
+    for(let i=tracks.length-1;i>=0;i--){
+      if(Date.now()-tracks[i].birth>TRACK_LIFE){
+        const tr=tracks[i];
+        glows.push({x:tr.x,y:tr.y,z:tr.z,birth:Date.now()});
+        tracks.splice(i,1);
+      }
+    }
+    particles.forEach(p=>{
+      if(!p.persistent){
+        p.x+=p.vx*dt; p.y+=p.vy*dt; p.z+=p.z*0.1;
+        const pr=PARTICLE_RADIUS*sizeScale;
+        if(p.x<pr){p.x=pr;p.vx*=-1;} if(p.x>ov.width-pr){p.x=ov.width-pr;p.vx*=-1;}
+        if(p.y<pr){p.y=pr;p.vy*=-1;} if(p.y>ov.height-pr){p.y=ov.height-pr;p.vy*=-1;}
+      }
+    });
+    for(let i=particles.length-1;i>=0;i--){
+      if(!particles[i].persistent&&Date.now()-particles[i].birth>PARTICLE_LIFE) particles.splice(i,1);
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,ov.width,ov.height);
+    const now=Date.now();
+    if((drawMode==='all'||drawMode==='line')&&linePath.length>1){
+      const blink=Math.sin(now*0.01)*0.5+0.5, h=(hueOffset+now*0.05)%360;
+      ctx.lineWidth=1*sizeScale;ctx.shadowBlur=8;ctx.shadowColor=`hsl(${h},100%,80%)`;
+      ctx.strokeStyle=`hsla(${h},100%,50%,${blink})`;ctx.beginPath();
+      linePath.forEach((pt,i)=>{const f=FOV/(FOV+pt.z),x2=(pt.x-ov.width/2)*f+ov.width/2,y2=(pt.y-ov.height/2)*f+ov.height/2;i?ctx.lineTo(x2,y2):ctx.moveTo(x2,y2);} );
+      ctx.stroke();ctx.shadowBlur=0;
+    }
+    if(drawMode==='all'||drawMode==='glows'){
+      for(let i=glows.length-1;i>=0;i--){
+        const g=glows[i], age=now-g.birth;
+        if(age>GLOW_LIFE){glows.splice(i,1);continue;}
+        const t=1-age/GLOW_LIFE;
+        const f=FOV/(FOV+g.z);
+        const alpha=t*0.3*(drawMode==='glows'?2:1);
+        const rad=TRACK_RADIUS*sizeScale*f*(drawMode==='glows'?2:1)*(1+0.5*(1-t));
+        ctx.fillStyle=`hsla(${hueOffset+200},100%,70%,${Math.min(alpha,1)})`;
+        ctx.beginPath();ctx.arc(g.x,g.y,rad,0,2*Math.PI);ctx.fill();
+      }
+    }
+    if(drawMode==='all'||drawMode==='circles'||drawMode==='shapes'){
+      const dyn=SHAPES[Math.floor(now/SHAPE_INTERVAL)%SHAPES.length];
+      const shape=manualShape||dyn;
+      tracks.forEach(tr=>{
+        const age=now-tr.birth, t=age/TRACK_LIFE, h=(hueOffset+180*t)%360, f=FOV/(FOV+tr.z);
+        const x2=(tr.x-ov.width/2)*f+ov.width/2, y2=(tr.y-ov.height/2)*f+ov.height/2;
+        const r=TRACK_RADIUS*sizeScale*f;
+        ctx.strokeStyle=`hsl(${h},100%,60%)`;ctx.lineWidth=2*sizeScale;
+        if(drawMode==='all'||drawMode==='shapes') drawShape(ctx,shape,x2,y2,r);
+        if(drawMode==='all'||drawMode==='circles'){ctx.beginPath();ctx.arc(x2,y2,r,0,2*Math.PI);ctx.stroke();}
+      });
+    }
+    if(drawMode==='all'||drawMode==='particles'){
+      particles.forEach(p=>{
+        const t=Math.min((now-p.birth)/PARTICLE_LIFE,1), h=(hueOffset+180*t)%360, f=FOV/(FOV+p.z);
+        const pr=PARTICLE_RADIUS*sizeScale*f, x2=(p.x-ov.width/2)*f+ov.width/2, y2=(p.y-ov.height/2)*f+ov.height/2;
+        ctx.fillStyle=`hsl(${h},100%,60%)`;ctx.beginPath();ctx.arc(x2,y2,pr,0,2*Math.PI);ctx.fill();
+      });
+    }
+  }
+
+  function drawShape(ctx,s,x,y,r){
+    ctx.beginPath();
+    switch(s){
+      case 'circle':ctx.arc(x,y,r,0,2*Math.PI);break;
+      case 'square':ctx.rect(x-r,y-r,2*r,2*r);break;
+      case 'triangle':for(let i=0;i<3;i++){const a=i*2*Math.PI/3-Math.PI/2,px=x+Math.cos(a)*r,py=y+Math.sin(a)*r;i?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.closePath();break;
+      case 'pentagon':for(let i=0;i<5;i++){const a=i*2*Math.PI/5-Math.PI/2,px=x+Math.cos(a)*r,py=y+Math.sin(a)*r;i?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.closePath();break;
+      case 'hexagon':for(let i=0;i<6;i++){const a=i*2*Math.PI/6-Math.PI/2,px=x+Math.cos(a)*r,py=y+Math.sin(a)*r;i?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.closePath();break;
+      case 'star':for(let i=0;i<5;i++){const a1=i*2*Math.PI/5-Math.PI/2,a2=a1+Math.PI/5,x1=x+Math.cos(a1)*r,y1=y+Math.sin(a1)*r,x2=x+Math.cos(a2)*r/2,y2=y+Math.sin(a2)*r/2;i?ctx.lineTo(x1,y1):ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);}ctx.closePath();break;
+      case 'diamond':ctx.moveTo(x,y-r);ctx.lineTo(x+r,y);ctx.lineTo(x,y+r);ctx.lineTo(x-r,y);ctx.closePath();break;
+      case 'octagon':for(let i=0;i<8;i++){const a=i*2*Math.PI/8-Math.PI/8,px=x+Math.cos(a)*r,py=y+Math.sin(a)*r;i?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.closePath();break;
+      case 'cross':ctx.moveTo(x-r,y);ctx.lineTo(x+r,y);ctx.moveTo(x,y-r);ctx.lineTo(x,y+r);break;
+      case 'trapezoid':ctx.moveTo(x-r*0.5,y-r);ctx.lineTo(x+r*0.5,y-r);ctx.lineTo(x+r,y+r);ctx.lineTo(x-r,y+r);ctx.closePath();break;
+      case 'parallelogram':ctx.moveTo(x-r,y-r);ctx.lineTo(x+r*0.5,y-r);ctx.lineTo(x+r,y+r);ctx.lineTo(x-r*0.5,y+r);ctx.closePath();break;
+    }
+    ctx.stroke();
+  }
+
+  function clean(){
+    const now=Date.now();
+    while(glows.length && now-glows[0].birth>GLOW_LIFE) glows.shift();
+    while(linePath.length && now-linePath[0].birth>LINE_LIFE) linePath.shift();
+  }
+</script>
+</body>
+</html>

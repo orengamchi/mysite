@@ -1,0 +1,2815 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>מערכת ניהול הפקות גרפיות - After Effects</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #E31937;
+            --secondary-color: #0038A8;
+            --accent-color: #FFD700;
+            --breaking-news: #E31937;
+            --politics: #0038A8;
+            --economy: #009F5F;
+            --culture: #922790;
+            --sports: #FF6B00;
+            --live: #E31937;
+            --light-gray: #f5f5f5;
+            --dark-gray: #222;
+            --studio-bg: #111;
+            --validation: #4CAF50;
+            --exception: #FF9800;
+        }
+        
+        body {
+            font-family: 'Open Sans Hebrew', 'Arial', sans-serif;
+            direction: rtl;
+            margin: 0;
+            padding: 0;
+            background-color: var(--studio-bg);
+            color: white;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-rows: auto 1fr auto;
+            height: 100vh;
+        }
+        
+        header {
+            grid-column: 1;
+            background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+            color: white;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.5);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1.2em;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .logo img {
+            height: 30px;
+            margin-left: 10px;
+        }
+        
+        .live-indicator {
+            background-color: var(--live);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.8em;
+            display: flex;
+            align-items: center;
+            animation: pulse 2s infinite;
+        }
+        
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background-color: white;
+            border-radius: 50%;
+            margin-left: 6px;
+        }
+        
+        .import-options {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+        
+        .import-options::-webkit-scrollbar {
+            height: 4px;
+        }
+        
+        .import-options::-webkit-scrollbar-thumb {
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 2px;
+        }
+        
+        .sidebar {
+            background-color: var(--dark-gray);
+            border-left: 1px solid rgba(255,255,255,0.1);
+            overflow-y: auto;
+            display: none;
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 280px;
+            z-index: 100;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .sidebar.active {
+            transform: translateX(0);
+            display: block;
+        }
+        
+        .main-content {
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #1a1a1a;
+        }
+        
+        .card {
+            background-color: #2a2a2a;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            margin-bottom: 15px;
+            padding: 15px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        h1, h2, h3, h4 {
+            color: white;
+            margin-top: 0;
+        }
+        
+        h2 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        
+        h3 {
+            color: var(--accent-color);
+            font-size: 1.1em;
+        }
+        
+        .program-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: bold;
+            margin-left: 8px;
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .category-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 15px;
+            font-size: 0.7em;
+            font-weight: bold;
+            margin-left: 6px;
+            cursor: pointer;
+        }
+        
+        .breaking { background-color: var(--breaking-news); }
+        .politics { background-color: var(--politics); }
+        .economy { background-color: var(--economy); }
+        .culture { background-color: var(--culture); }
+        .sports { background-color: var(--sports); }
+        .live { background-color: var(--live); }
+        .validation { background-color: var(--validation); }
+        .exception { background-color: var(--exception); }
+        
+        .email-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .email-item {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+            background-color: #333;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            position: relative;
+        }
+        
+        .email-item:active {
+            transform: scale(0.98);
+        }
+        
+        .email-item:hover {
+            background-color: #3a3a3a;
+        }
+        
+        .email-item.active {
+            background-color: #0038A8;
+            border-left: 4px solid var(--accent-color);
+        }
+        
+        .email-source {
+            position: absolute;
+            left: 8px;
+            top: 8px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.65em;
+            font-weight: bold;
+        }
+        
+        .source-gmail {
+            background-color: #EA4335;
+        }
+        
+        .source-outlook {
+            background-color: #0072C6;
+        }
+        
+        .email-subject {
+            font-weight: bold;
+            margin-bottom: 4px;
+            padding-right: 22px;
+            color: white;
+            font-size: 0.9em;
+        }
+        
+        .email-snippet {
+            color: #bbb;
+            font-size: 0.85em;
+            padding-right: 22px;
+        }
+        
+        .email-time {
+            font-size: 0.75em;
+            color: #999;
+            margin-top: 4px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+            color: #ddd;
+            font-size: 0.9em;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            font-family: inherit;
+            background-color: #333;
+            color: white;
+            font-size: 1em;
+            -webkit-appearance: none;
+        }
+        
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+        }
+        
+        button:active {
+            transform: scale(0.96);
+        }
+        
+        button i {
+            margin-left: 6px;
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary-color);
+        }
+        
+        .btn-secondary:active {
+            background-color: #002a8a;
+        }
+        
+        .btn-accent {
+            background-color: var(--accent-color);
+            color: #333;
+        }
+        
+        .btn-accent:active {
+            background-color: #e6c200;
+        }
+        
+        .btn-validation {
+            background-color: var(--validation);
+            color: white;
+        }
+        
+        .btn-exception {
+            background-color: var(--exception);
+            color: white;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .status-new {
+            background-color: #FFEB3B;
+            color: #000;
+        }
+        
+        .status-urgent {
+            background-color: #E31937;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-in-progress {
+            background-color: #2196F3;
+            color: white;
+        }
+        
+        .status-completed {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .status-approved {
+            background-color: #8BC34A;
+            color: white;
+        }
+        
+        .status-revision {
+            background-color: #FF9800;
+            color: white;
+        }
+        
+        .automation-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .automation-card {
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background-color: #333;
+            display: flex;
+            flex-direction: column;
+            touch-action: manipulation;
+        }
+        
+        .automation-card:active {
+            transform: scale(0.96);
+        }
+        
+        .automation-card.selected {
+            border-color: var(--accent-color);
+            background-color: rgba(255, 215, 0, 0.1);
+        }
+        
+        .automation-icon {
+            font-size: 1.5em;
+            margin-bottom: 8px;
+            color: var(--accent-color);
+        }
+        
+        .progress-steps {
+            margin-top: 20px;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 12px;
+            border-radius: 6px;
+            background-color: #333;
+            position: relative;
+            border-left: 4px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .step:active {
+            background-color: #3a3a3a;
+        }
+        
+        .step.completed {
+            background-color: rgba(76, 175, 80, 0.1);
+            border-left-color: #4CAF50;
+        }
+        
+        .step.current {
+            background-color: rgba(33, 150, 243, 0.1);
+            border-left-color: #2196F3;
+            box-shadow: 0 2px 10px rgba(33, 150, 243, 0.2);
+        }
+        
+        .step.locked {
+            opacity: 0.6;
+            background-color: #2a2a2a;
+        }
+        
+        .step-number {
+            width: 25px;
+            height: 25px;
+            background-color: #444;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 12px;
+            flex-shrink: 0;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .step.completed .step-number {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .step.current .step-number {
+            background-color: #2196F3;
+            color: white;
+        }
+        
+        .step-content {
+            flex-grow: 1;
+        }
+        
+        .step-title {
+            font-weight: bold;
+            margin-bottom: 4px;
+            font-size: 0.9em;
+        }
+        
+        .step-description {
+            font-size: 0.8em;
+            color: #bbb;
+        }
+        
+        .step-actions {
+            margin-right: 12px;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .step-duration {
+            font-size: 0.75em;
+            color: #999;
+            margin-top: 4px;
+        }
+        
+        .search-bar {
+            margin-bottom: 15px;
+            position: relative;
+        }
+        
+        .search-bar input {
+            padding: 10px 40px 10px 12px;
+            border-radius: 25px;
+            border: 1px solid #444;
+            background-color: #333;
+            color: white;
+            font-size: 0.9em;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+            font-size: 0.9em;
+        }
+        
+        .extracted-data {
+            background-color: rgba(0, 56, 168, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            border: 1px solid rgba(0, 56, 168, 0.3);
+        }
+        
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+        
+        .data-item {
+            background-color: #333;
+            border-radius: 6px;
+            padding: 12px;
+            border-left: 4px solid var(--accent-color);
+        }
+        
+        .data-label {
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: var(--accent-color);
+            font-size: 0.85em;
+        }
+        
+        .data-value {
+            font-size: 1em;
+            word-break: break-word;
+        }
+        
+        .drag-drop-area {
+            border: 2px dashed #444;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background-color: rgba(255,255,255,0.03);
+            touch-action: manipulation;
+        }
+        
+        .drag-drop-area:active {
+            transform: scale(0.98);
+        }
+        
+        .drag-drop-area:hover {
+            border-color: var(--primary-color);
+            background-color: rgba(227, 25, 55, 0.05);
+        }
+        
+        .drag-drop-area.active {
+            border-color: var(--secondary-color);
+            background-color: rgba(0, 56, 168, 0.05);
+        }
+        
+        .file-list {
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+        }
+        
+        .file-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px;
+            background-color: #333;
+            border-radius: 8px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        
+        .file-item:active {
+            transform: scale(0.96);
+        }
+        
+        .file-icon {
+            font-size: 2em;
+            margin-bottom: 8px;
+        }
+        
+        .file-name {
+            text-align: center;
+            word-break: break-word;
+            font-size: 0.85em;
+        }
+        
+        .file-size {
+            font-size: 0.75em;
+            color: #999;
+            margin-top: 4px;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+        }
+        
+        .modal-content {
+            background-color: #2a2a2a;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 20px;
+            box-shadow: 0 5px 30px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .close-modal {
+            float: left;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #999;
+            padding: 5px;
+        }
+        
+        .close-modal:active {
+            color: white;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #444;
+            margin-bottom: 15px;
+            overflow-x: auto;
+        }
+        
+        .tabs::-webkit-scrollbar {
+            height: 4px;
+        }
+        
+        .tabs::-webkit-scrollbar-thumb {
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 2px;
+        }
+        
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-weight: bold;
+            color: #999;
+            transition: all 0.2s;
+            white-space: nowrap;
+            touch-action: manipulation;
+        }
+        
+        .tab:active {
+            transform: scale(0.96);
+        }
+        
+        .tab.active {
+            border-bottom-color: var(--primary-color);
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .broadcast-elements {
+            margin-top: 25px;
+        }
+        
+        .elements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+        }
+        
+        .element-card {
+            background-color: #333;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            touch-action: manipulation;
+        }
+        
+        .element-card:active {
+            transform: scale(0.96);
+            border-color: var(--accent-color);
+        }
+        
+        .element-icon {
+            font-size: 1.8em;
+            margin-bottom: 8px;
+            color: var(--accent-color);
+        }
+        
+        .timeline {
+            margin-top: 25px;
+            position: relative;
+            height: 60px;
+            background-color: #333;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .timeline-now {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            background-color: var(--accent-color);
+            z-index: 2;
+        }
+        
+        .timeline-now::after {
+            content: 'עכשיו';
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background-color: var(--accent-color);
+            color: #333;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: bold;
+        }
+        
+        .timeline-item {
+            position: absolute;
+            top: 15px;
+            bottom: 15px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            font-size: 0.8em;
+            font-weight: bold;
+            overflow: hidden;
+        }
+        
+        .timeline-live {
+            background-color: rgba(227, 25, 55, 0.7);
+            left: 50%;
+            right: 10%;
+            border-left: 3px solid var(--accent-color);
+        }
+        
+        .timeline-upcoming {
+            background-color: rgba(0, 56, 168, 0.7);
+            left: 60%;
+            right: 5%;
+        }
+        
+        .timeline-completed {
+            background-color: rgba(76, 175, 80, 0.7);
+            left: 10%;
+            right: 52%;
+        }
+        
+        .ae-preview {
+            background-color: #111;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 150px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .ae-preview-placeholder {
+            color: #444;
+            font-size: 1em;
+            text-align: center;
+        }
+        
+        .ae-controls {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        
+        .ae-control-btn {
+            background-color: #333;
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            touch-action: manipulation;
+        }
+        
+        .ae-control-btn:active {
+            background-color: var(--primary-color);
+            transform: scale(1.1);
+        }
+        
+        .priority-indicator {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        
+        .priority-high {
+            background-color: var(--breaking-news);
+            box-shadow: 0 0 8px var(--breaking-news);
+        }
+        
+        .priority-medium {
+            background-color: var(--accent-color);
+            box-shadow: 0 0 8px var(--accent-color);
+        }
+        
+        .priority-low {
+            background-color: #4CAF50;
+            box-shadow: 0 0 8px #4CAF50;
+        }
+        
+        .program-schedule {
+            margin-top: 25px;
+        }
+        
+        .schedule-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            border-bottom: 1px solid #444;
+        }
+        
+        .schedule-time {
+            font-weight: bold;
+            min-width: 60px;
+            font-size: 0.9em;
+        }
+        
+        .schedule-title {
+            flex-grow: 1;
+            padding: 0 10px;
+            font-size: 0.9em;
+        }
+        
+        .schedule-status {
+            font-size: 0.75em;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        
+        .schedule-live {
+            background-color: var(--live);
+            color: white;
+        }
+        
+        .schedule-upcoming {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        .schedule-completed {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .template-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .template-carousel {
+            display: flex;
+            overflow-x: auto;
+            gap: 15px;
+            padding: 10px 0;
+            scroll-snap-type: x mandatory;
+        }
+        
+        .template-carousel::-webkit-scrollbar {
+            height: 6px;
+        }
+        
+        .template-carousel::-webkit-scrollbar-thumb {
+            background-color: rgba(255,255,255,0.3);
+            border-radius: 3px;
+        }
+        
+        .template-item {
+            background-color: #333;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+            touch-action: manipulation;
+            scroll-snap-align: start;
+            flex: 0 0 auto;
+            width: 140px;
+        }
+        
+        .template-item:active {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border-color: var(--accent-color);
+        }
+        
+        .template-thumbnail {
+            height: 90px;
+            background-color: #444;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 1.5em;
+            overflow: hidden;
+        }
+        
+        .template-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .template-info {
+            padding: 12px;
+        }
+        
+        .template-title {
+            font-weight: bold;
+            margin-bottom: 4px;
+            font-size: 0.9em;
+        }
+        
+        .template-type {
+            font-size: 0.75em;
+            color: #999;
+        }
+        
+        .script-output {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: monospace;
+            padding: 12px;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 12px;
+            border: 1px solid #444;
+            font-size: 0.85em;
+        }
+        
+        /* אנימציות */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .blink {
+            animation: blink 1.5s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* תפריט ניווט למובייל */
+        .mobile-nav {
+            display: flex;
+            justify-content: space-around;
+            background-color: var(--dark-gray);
+            padding: 10px 0;
+            position: sticky;
+            bottom: 0;
+            z-index: 50;
+        }
+        
+        .nav-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #999;
+            font-size: 0.8em;
+            text-decoration: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            transition: all 0.2s;
+        }
+        
+        .nav-btn i {
+            font-size: 1.2em;
+            margin-bottom: 3px;
+        }
+        
+        .nav-btn.active {
+            color: var(--accent-color);
+            background-color: rgba(255,215,0,0.1);
+        }
+        
+        /* עיצוב רספונסיבי */
+        @media (min-width: 768px) {
+            .container {
+                grid-template-columns: 280px 1fr;
+                grid-template-rows: 80px 1fr;
+            }
+            
+            header {
+                grid-column: 1 / 3;
+                flex-direction: row;
+                padding: 0 20px;
+            }
+            
+            .header-top {
+                width: auto;
+            }
+            
+            .logo {
+                font-size: 1.5em;
+            }
+            
+            .logo img {
+                height: 35px;
+            }
+            
+            .import-options {
+                margin-top: 0;
+            }
+            
+            .sidebar {
+                display: block;
+                position: static;
+                width: auto;
+                transform: none;
+            }
+            
+            .mobile-nav {
+                display: none;
+            }
+            
+            .template-carousel {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                overflow-x: visible;
+            }
+        }
+        
+        @media (min-width: 992px) {
+            .container {
+                grid-template-columns: 320px 1fr;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+        }
+        
+        /* עיצוב ספציפי לאוטומציות לפי קטגוריה */
+        .automation-card[data-category="breaking"] {
+            border-left: 4px solid var(--breaking-news);
+        }
+        .automation-card[data-category="politics"] {
+            border-left: 4px solid var(--politics);
+        }
+        .automation-card[data-category="economy"] {
+            border-left: 4px solid var(--economy);
+        }
+        .automation-card[data-category="sports"] {
+            border-left: 4px solid var(--sports);
+        }
+        .automation-card[data-category="culture"] {
+            border-left: 4px solid var(--culture);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-top">
+                <div class="logo">
+                    <img src="https://via.placeholder.com/150x50?text=News+Channel" alt="לוגו ערוץ החדשות">
+                    מערכת ניהול הפקות
+                </div>
+                <div class="live-indicator">
+                    שידור חי <div class="live-dot blink"></div>
+                </div>
+            </div>
+            <div class="import-options">
+                <button class="btn-secondary" id="import-outlook"><i class="fas fa-envelope"></i> ייבוא מ-Outlook</button>
+                <button id="import-gmail"><i class="fab fa-google"></i> ייבוא מ-Gmail</button>
+            </div>
+        </header>
+        
+        <aside class="sidebar" id="sidebar">
+            <div class="search-bar">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" placeholder="חיפוש בפרויקטים, תוכניות או משימות...">
+            </div>
+            
+            <h3><i class="fas fa-calendar-day"></i> לוח שידורים היום</h3>
+            <div class="program-schedule">
+                <div class="schedule-item">
+                    <div class="schedule-time">18:00</div>
+                    <div class="schedule-title">חדשות הערב</div>
+                    <div class="schedule-status schedule-live">שידור חי</div>
+                </div>
+                <div class="schedule-item">
+                    <div class="schedule-time">19:30</div>
+                    <div class="schedule-title">המגזין הפוליטי</div>
+                    <div class="schedule-status schedule-upcoming">בהכנה</div>
+                </div>
+                <div class="schedule-item">
+                    <div class="schedule-time">20:30</div>
+                    <div class="schedule-title">כלכלה עכשיו</div>
+                    <div class="schedule-status schedule-upcoming">בהכנה</div>
+                </div>
+                <div class="schedule-item">
+                    <div class="schedule-time">22:00</div>
+                    <div class="schedule-title">חדשות הלילה</div>
+                    <div class="schedule-status schedule-upcoming">בהכנה</div>
+                </div>
+                <div class="schedule-item">
+                    <div class="schedule-time">08:00</div>
+                    <div class="schedule-title">חדשות הבוקר</div>
+                    <div class="schedule-status schedule-completed">מוכן</div>
+                </div>
+            </div>
+            
+            <h3 style="margin-top: 25px;"><i class="fas fa-inbox"></i> בקשות אחרונות</h3>
+            <ul class="email-list">
+                <li class="email-item active" data-category="breaking" data-request="1">
+                    <div class="priority-indicator priority-high"></div>
+                    <div class="email-source source-gmail">G</div>
+                    <div class="email-subject">בקשה דחופה: עדכון גרפיקה לחדשות הערב <span class="category-badge breaking" data-category="breaking">דחוף!</span></div>
+                    <div class="email-snippet">יש להכניס את הנתונים החדשים של הסקר הפוליטי...</div>
+                    <div class="email-time">לפני 15 דקות</div>
+                </li>
+                <li class="email-item" data-category="politics" data-request="2">
+                    <div class="priority-indicator priority-medium"></div>
+                    <div class="email-source source-outlook">O</div>
+                    <div class="email-subject">הכנת פתיח לתוכנית "כלכלה עכשיו" <span class="category-badge economy" data-category="economy">כלכלה</span></div>
+                    <div class="email-snippet">נדרש פתיח חדש עם נתוני השוק המעודכנים...</div>
+                    <div class="email-time">היום, 10:30</div>
+                </li>
+                <li class="email-item" data-category="culture" data-request="3">
+                    <div class="priority-indicator priority-low"></div>
+                    <div class="email-source source-gmail">G</div>
+                    <div class="email-subject">אנימציות לפרק הספיישל "תרבות הפנאי" <span class="category-badge culture" data-category="culture">תרבות</span></div>
+                    <div class="email-snippet">נדרשות אנימציות מעבר בין הקטעים...</div>
+                    <div class="email-time">אתמול, 16:45</div>
+                </li>
+                <li class="email-item" data-category="sports" data-request="4">
+                    <div class="priority-indicator priority-medium"></div>
+                    <div class="email-source source-outlook">O</div>
+                    <div class="email-subject">עדכון תוצאות ליגת הכדורגל <span class="category-badge sports" data-category="sports">ספורט</span></div>
+                    <div class="email-snippet">יש לעדכן את טבלת הליגה עם תוצאות הסיבוב האחרון...</div>
+                    <div class="email-time">היום, 14:20</div>
+                </li>
+                <li class="email-item" data-category="weather" data-request="5">
+                    <div class="priority-indicator priority-low"></div>
+                    <div class="email-source source-gmail">G</div>
+                    <div class="email-subject">תחזית מזג אוויר לסוף השבוע <span class="category-badge weather" data-category="weather">מזג אוויר</span></div>
+                    <div class="email-snippet">נדרש עדכון לתחזית עם הנתונים החדשים מהשירות המטאורולוגי...</div>
+                    <div class="email-time">אתמול, 18:30</div>
+                </li>
+                <li class="email-item" data-category="breaking" data-request="6">
+                    <div class="priority-indicator priority-high"></div>
+                    <div class="email-source source-outlook">O</div>
+                    <div class="email-subject">דיווח מיוחד: אירוע ביטחוני <span class="category-badge breaking" data-category="breaking">דחוף!</span></div>
+                    <div class="email-snippet">יש להכין גרפיקה מיוחדת לאירוע הביטחוני הנוכחי...</div>
+                    <div class="email-time">לפני 30 דקות</div>
+                </li>
+                <li class="email-item" data-category="economy" data-request="7">
+                    <div class="priority-indicator priority-medium"></div>
+                    <div class="email-source source-gmail">G</div>
+                    <div class="email-subject">עדכון מדד המחירים לצרכן <span class="category-badge economy" data-category="economy">כלכלה</span></div>
+                    <div class="email-snippet">יש לעדכן את הגרפים עם נתוני האינפלציה החדשים...</div>
+                    <div class="email-time">היום, 09:15</div>
+                </li>
+                <li class="email-item" data-category="politics" data-request="8">
+                    <div class="priority-indicator priority-medium"></div>
+                    <div class="email-source source-outlook">O</div>
+                    <div class="email-subject">הכנת גרפיקה לדיון בכנסת <span class="category-badge politics" data-category="politics">פוליטיקה</span></div>
+                    <div class="email-snippet">נדרשת הכנת גרפיקה לדיון הצפוי בכנסת מחר...</div>
+                    <div class="email-time">אתמול, 20:10</div>
+                </li>
+                <li class="email-item" data-category="culture" data-request="9">
+                    <div class="priority-indicator priority-low"></div>
+                    <div class="email-source source-gmail">G</div>
+                    <div class="email-subject">פסטיבל הסרטים הבינלאומי <span class="category-badge culture" data-category="culture">תרבות</span></div>
+                    <div class="email-snippet">יש להכין פתיח מיוחד לפסטיבל הסרטים...</div>
+                    <div class="email-time">לפני 3 ימים</div>
+                </li>
+                <li class="email-item" data-category="sports" data-request="10">
+                    <div class="priority-indicator priority-medium"></div>
+                    <div class="email-source source-outlook">O</div>
+                    <div class="email-subject">אולימפיאדת פריז 2024 <span class="category-badge sports" data-category="sports">ספורט</span></div>
+                    <div class="email-snippet">הכנת גרפיקה לקראת האולימפיאדה הקרובה...</div>
+                    <div class="email-time">לפני 5 ימים</div>
+                </li>
+                <li class="email-item" data-category="weather" data-request="11">
+                    <div class="priority-indicator priority-low"></div>
+                    <div class="email-source source-gmail">G</div>
+                    <div class="email-subject">עדכון גרפי טמפרטורות <span class="category-badge weather" data-category="weather">מזג אוויר</span></div>
+                    <div class="email-snippet">יש לעדכן את גרפי הטמפרטורות לחודש יולי...</div>
+                    <div class="email-time">לפני שבוע</div>
+                </li>
+                <li class="email-item" data-category="breaking" data-request="12">
+                    <div class="priority-indicator priority-high"></div>
+                    <div class="email-source source-outlook">O</div>
+                    <div class="email-subject">דיווח מיוחד: אסון טבע <span class="category-badge breaking" data-category="breaking">דחוף!</span></div>
+                    <div class="email-snippet">יש להכין גרפיקה מיוחדת לאירוע הטבע הקשה...</div>
+                    <div class="email-time">לפני שעה</div>
+                </li>
+                <li class="email-item" data-category="economy" data-request="13">
+                    <div class="priority-indicator priority-medium"></div>
+                    <div class="email-source source-gmail">G</div>
+                    <div class="email-subject">עדכון שערי מטבע חוץ <span class="category-badge economy" data-category="economy">כלכלה</span></div>
+                    <div class="email-snippet">יש לעדכן את גרפי שערי המטבע עם הנתונים המעודכנים...</div>
+                    <div class="email-time">היום, 11:45</div>
+                </li>
+            </ul>
+        </aside>
+        
+        <main class="main-content">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>בקשה דחופה: עדכון גרפיקה לחדשות הערב <span class="program-badge">חדשות הערב</span></h2>
+                    <div class="status-badge status-urgent">דחוף!</div>
+                </div>
+                
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+                    <div><i class="fas fa-user"></i> נשלח מאת: דנה לוי (מפיקת תוכן)</div>
+                    <div><i class="fas fa-clock"></i> תאריך: 12/06/2023 | זמן הגשה: 18:30</div>
+                    <div><i class="fas fa-tag"></i> קטגוריה: <span class="category-badge breaking" id="current-category">חדשות דחופות</span></div>
+                </div>
+                
+                <div class="form-group">
+                    <label><i class="fas fa-envelope-open-text"></i> תוכן הבקשה המקורי:</label>
+                    <textarea readonly id="request-content">לצוות הגרפיקה היקר,
+
+יש לבצע עדכון דחוף לגרפיקה של חדשות הערב בעקבות נתוני הסקר האחרון שהתקבלו:
+1. עדכון תוצאות הסקר הפוליטי - קובץ מצורף
+2. הוספת נתוני אבטלה מעודכנים
+3. הכנת גרף השוואתי בין המפלגות
+4. הכנת אנימציה לנתוני האינפלציה
+
+נדרש להעלות את כל העדכונים לאפטר אפקטס עד השעה 18:00.
+
+פרטי הפרויקט:
+- שם הפרויקט: news_20230612_evening_politics
+- תיקייה: X:\Projects\News\Evening\2023-06-12
+- פורמט: HD 1080p 25fps
+- תבנית: SIMPLE_PIC_AI_TEST_V1.aep
+
+בתודה,
+דנה
+מפיקת תוכן
+חדשות הערב</textarea>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button class="btn-validation" id="validate-text"><i class="fas fa-spell-check"></i> בדיקה לשונית</button>
+                    <button class="btn-exception" id="mark-exception"><i class="fas fa-exclamation-circle"></i> בקשה חריגה</button>
+                    <button class="btn-secondary" id="push-request"><i class="fas fa-bolt"></i> דחוף</button>
+                </div>
+                
+                <div class="extracted-data">
+                    <h3><i class="fas fa-magic"></i> נתונים שחולצו אוטומטית</h3>
+                    <div class="data-grid">
+                        <div class="data-item">
+                            <div class="data-label">שם הפרויקט:</div>
+                            <div class="data-value">news_20230612_evening_politics</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">תיקיית יעד:</div>
+                            <div class="data-value">X:\Projects\News\Evening\2023-06-12</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">תבנית After Effects:</div>
+                            <div class="data-value">SIMPLE_PIC_AI_TEST_V1.aep</div>
+                        </div>
+                        <div class="data-item">
+                            <div class="data-label">דדליין:</div>
+                            <div class="data-value">היום, 18:00</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3 style="margin-top: 20px;"><i class="fas fa-file-import"></i> קבצים מצורפים</h3>
+                <div class="drag-drop-area" id="drag-drop-area">
+                    <p><i class="fas fa-cloud-upload-alt" style="font-size: 1.5em; margin-bottom: 8px;"></i><br>
+                    גרור ושחרר קבצים כאן או לחץ לבחירת קבצים</p>
+                    <input type="file" id="file-input" style="display: none;" multiple>
+                    <div class="file-list" id="file-list">
+                        <div class="file-item">
+                            <div class="file-icon"><i class="fas fa-poll"></i></div>
+                            <div class="file-name">survey_data_2023.xlsx</div>
+                            <div class="file-size">245 KB</div>
+                        </div>
+                        <div class="file-item">
+                            <div class="file-icon"><i class="fas fa-film"></i></div>
+                            <div class="file-name">SIMPLE_PIC_AI_TEST_V1.aep</div>
+                            <div class="file-size">2.4 MB</div>
+                        </div>
+                        <div class="file-item">
+                            <div class="file-icon"><i class="fas fa-image"></i></div>
+                            <div class="file-name">bg1.jpg</div>
+                            <div class="file-size">1.1 MB</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3><i class="fas fa-cogs"></i> אוטומציות זמינות</h3>
+                <div class="automation-options" id="automation-options">
+                    <!-- אופציות אוטומציה יוטענו דינאמית -->
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn-accent" style="flex-grow: 1;" id="run-automation"><i class="fas fa-bolt"></i> הפעל אוטומציות נבחרות</button>
+                    <button class="btn-secondary" id="open-ae"><i class="fas fa-play"></i> פתח ב-AE</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2><i class="fas fa-tasks"></i> תהליך העבודה ב-After Effects</h2>
+                <p>התקדם שלב אחר שלב רק לאחר השלמת המשימה הנוכחית</p>
+                
+                <div class="progress-steps">
+                    <div class="step completed">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <div class="step-title">ייבוא מייל וסינון תוכן</div>
+                            <div class="step-description">ניתוח אוטומטי של תוכן המייל וחילוץ פרטים</div>
+                            <div class="step-duration"><i class="fas fa-clock"></i> הושלם לפני 5 דקות</div>
+                        </div>
+                        <div class="step-actions">
+                            <button disabled><i class="fas fa-check"></i> בוצע</button>
+                        </div>
+                    </div>
+                    <div class="step completed">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <div class="step-title">חילוץ נתונים אוטומטי</div>
+                            <div class="step-description">זיהוי שם פרויקט, תאריכים, קבצים מצורפים</div>
+                            <div class="step-duration"><i class="fas fa-clock"></i> הושלם לפני 4 דקות</div>
+                        </div>
+                        <div class="step-actions">
+                            <button disabled><i class="fas fa-check"></i> בוצע</button>
+                        </div>
+                    </div>
+                    <div class="step current">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <div class="step-title">הגדרת פרויקט After Effects</div>
+                            <div class="step-description">יצירת פרויקט חדש וטעינת התבנית</div>
+                        </div>
+                        <div class="step-actions">
+                            <button id="start-task"><i class="fas fa-arrow-right"></i> התחל משימה</button>
+                        </div>
+                    </div>
+                    <div class="step locked">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <div class="step-title">עדכון נתוני הסקר</div>
+                            <div class="step-description">הכנסת הנתונים החדשים לגרפים ולאנימציות</div>
+                        </div>
+                        <div class="step-actions">
+                            <button disabled><i class="fas fa-lock"></i> נעול</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2><i class="fas fa-desktop"></i> ניהול פרויקט After Effects</h2>
+                
+                <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+                    <div>
+                        <h3><i class="fas fa-cog"></i> הגדרות פרויקט</h3>
+                        
+                        <div class="form-group">
+                            <label>שם הפרויקט:</label>
+                            <input type="text" value="news_20230612_evening_politics" id="project-name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>תיקיית יעד:</label>
+                            <div style="display: flex;">
+                                <input type="text" value="X:\Projects\News\Evening\2023-06-12" id="project-folder" style="flex-grow: 1;">
+                                <button id="browse-folder" style="width: auto; margin-right: 8px;"><i class="fas fa-folder-open"></i></button>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>תבנית After Effects:</label>
+                            <select id="ae-template">
+                                <option value="SIMPLE_PIC_AI_TEST_V1.aep" selected>SIMPLE_PIC_AI_TEST_V1.aep</option>
+                                <option value="template_news_general_v1.aep">template_news_general_v1.aep</option>
+                                <option value="template_news_politics_v3.aep">template_news_politics_v3.aep</option>
+                                <option value="template_news_sports_v2.aep">template_news_sports_v2.aep</option>
+                                <option value="template_news_weather_v1.aep">template_news_weather_v1.aep</option>
+                                <option value="template_news_economy_v4.aep">template_news_economy_v4.aep</option>
+                                <option value="template_news_culture_v1.aep">template_news_culture_v1.aep</option>
+                                <option value="template_news_breaking_v3.aep">template_news_breaking_v3.aep</option>
+                                <option value="template_news_lower_third_v2.aep">template_news_lower_third_v2.aep</option>
+                                <option value="template_news_transition_v1.aep">template_news_transition_v1.aep</option>
+                                <option value="template_news_opener_v5.aep">template_news_opener_v5.aep</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>פורמט פלט:</label>
+                            <select id="output-format">
+                                <option>HD 720p 25fps</option>
+                                <option selected>HD 1080p 25fps</option>
+                                <option>4K 2160p 25fps</option>
+                            </select>
+                        </div>
+                        
+                        <button class="btn-secondary" id="save-settings" style="width: 100%; margin-top: 8px;"><i class="fas fa-save"></i> שמור הגדרות</button>
+                        
+                        <div class="form-group" style="margin-top: 15px;">
+                            <button id="generate-script" class="btn-accent" style="width: 100%; padding: 12px; font-size: 1em;">
+                                <i class="fas fa-code"></i> צור סקריפט ל-After Effects
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3><i class="fas fa-play-circle"></i> תצוגה מקדימה</h3>
+                        
+                        <div class="ae-preview">
+                            <div class="ae-preview-placeholder">
+                                <i class="fas fa-photo-film" style="font-size: 2.5em; margin-bottom: 12px;"></i><br>
+                                תצוגה מקדימה תוצג כאן לאחר פתיחת הפרויקט
+                            </div>
+                        </div>
+                        
+                        <div class="ae-controls">
+                            <button class="ae-control-btn"><i class="fas fa-play"></i></button>
+                            <button class="ae-control-btn"><i class="fas fa-pause"></i></button>
+                            <button class="ae-control-btn"><i class="fas fa-stop"></i></button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="script-output-container" style="display: none; margin-top: 20px;">
+                    <h3><i class="fas fa-file-code"></i> קובץ הסקריפט שנוצר</h3>
+                    <div class="script-output" id="script-content"></div>
+                    <button id="download-script" class="btn-secondary" style="margin-top: 8px;">
+                        <i class="fas fa-download"></i> הורד קובץ .jsx
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2><i class="fas fa-box-open"></i> ספריית אלמנטים לשידור</h2>
+                
+                <div class="broadcast-elements">
+                    <h3>תבניות After Effects</h3>
+                    <div class="template-carousel">
+                        <div class="template-item" data-template="SIMPLE_PIC_AI_TEST_V1.aep">
+                            <div class="template-thumbnail">
+                                <img src="https://raw.githubusercontent.com/orengamchi/after_effects_ai/main/preview.jpg" alt="תבנית AI">
+                            </div>
+                            <div class="template-info">
+                                <div class="template-title">תבנית AI בסיסית</div>
+                                <div class="template-type">SIMPLE_PIC_AI_TEST_V1.aep</div>
+                            </div>
+                        </div>
+                        
+                        <div class="template-item" data-template="template_news_general_v1.aep">
+                            <div class="template-thumbnail"><i class="fas fa-newspaper"></i></div>
+                            <div class="template-info">
+                                <div class="template-title">תבנית חדשות כללי</div>
+                                <div class="template-type">template_news_general_v1.aep</div>
+                            </div>
+                        </div>
+                        
+                        <div class="template-item" data-template="template_news_politics_v3.aep">
+                            <div class="template-thumbnail"><i class="fas fa-landmark"></i></div>
+                            <div class="template-info">
+                                <div class="template-title">תבנית פוליטיקה</div>
+                                <div class="template-type">template_news_politics_v3.aep</div>
+                            </div>
+                        </div>
+                        
+                        <div class="template-item" data-template="template_news_sports_v2.aep">
+                            <div class="template-thumbnail"><i class="fas fa-running"></i></div>
+                            <div class="template-info">
+                                <div class="template-title">תבנית ספורט</div>
+                                <div class="template-type">template_news_sports_v2.aep</div>
+                            </div>
+                        </div>
+                        
+                        <div class="template-item" data-template="template_news_weather_v1.aep">
+                            <div class="template-thumbnail"><i class="fas fa-cloud-sun"></i></div>
+                            <div class="template-info">
+                                <div class="template-title">תבנית מזג אוויר</div>
+                                <div class="template-type">template_news_weather_v1.aep</div>
+                            </div>
+                        </div>
+                        
+                        <div class="template-item" data-template="template_news_economy_v4.aep">
+                            <div class="template-thumbnail"><i class="fas fa-chart-line"></i></div>
+                            <div class="template-info">
+                                <div class="template-title">תבנית כלכלה</div>
+                                <div class="template-type">template_news_economy_v4.aep</div>
+                            </div>
+                        </div>
+                        
+                        <div class="template-item" data-template="template_news_culture_v1.aep">
+                            <div class="template-thumbnail"><i class="fas fa-theater-masks"></i></div>
+                            <div class="template-info">
+                                <div class="template-title">תבנית תרבות</div>
+                                <div class="template-type">template_news_culture_v1.aep</div>
+                            </div>
+                        </div>
+                        
+                        <div class="template-item" data-template="template_news_breaking_v3.aep">
+                            <div class="template-thumbnail"><i class="fas fa-exclamation-triangle"></i></div>
+                            <div class="template-info">
+                                <div class="template-title">תבנית חדשות דחופות</div>
+                                <div class="template-type">template_news_breaking_v3.aep</div>
+                            </div>
+                        </div>
+                        
+                        <div class="template-item" data-template="template_news_lower_third_v2.aep">
+                            <div class="template-thumbnail"><i class="fas fa-closed-captioning"></i></div>
+                            <div class="template-info">
+                                <div class="template-title">תבנית כיתוב תחתון</div>
+                                <div class="template-type">template_news_lower_third_v2.aep</div>
+                            </div>
+                        </div>
+                        
+                        <div class="template-item" data-template="template_news_transition_v1.aep">
+                            <div class="template-thumbnail"><i class="fas fa-exchange-alt"></i></div>
+                            <div class="template-info">
+                                <div class="template-title">תבנית מעבר</div>
+                                <div class="template-type">template_news_transition_v1.aep</div>
+                            </div>
+                        </div>
+                        
+                        <div class="template-item" data-template="template_news_opener_v5.aep">
+                            <div class="template-thumbnail"><i class="fas fa-play-circle"></i></div>
+                            <div class="template-info">
+                                <div class="template-title">תבנית פתיח</div>
+                                <div class="template-type">template_news_opener_v5.aep</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h3 style="margin-top: 25px;">תמונות רקע</h3>
+                    <div class="elements-grid">
+                        <div class="element-card" data-bg="bg1.jpg">
+                            <div class="element-icon"><i class="fas fa-image"></i></div>
+                            <div>רקע 1</div>
+                        </div>
+                        <div class="element-card" data-bg="bg2.jpg">
+                            <div class="element-icon"><i class="fas fa-image"></i></div>
+                            <div>רקע 2</div>
+                        </div>
+                        <div class="element-card" data-bg="bg3.jpg">
+                            <div class="element-icon"><i class="fas fa-image"></i></div>
+                            <div>רקע 3</div>
+                        </div>
+                        <div class="element-card" data-bg="bg4.jpg">
+                            <div class="element-icon"><i class="fas fa-image"></i></div>
+                            <div>רקע 4</div>
+                        </div>
+                        <div class="element-card" data-bg="bg5.jpg">
+                            <div class="element-icon"><i class="fas fa-image"></i></div>
+                            <div>רקע 5</div>
+                        </div>
+                        <div class="element-card" data-bg="bg6.jpg">
+                            <div class="element-icon"><i class="fas fa-image"></i></div>
+                            <div>רקע 6</div>
+                        </div>
+                    </div>
+                    
+                    <h3 style="margin-top: 25px;">אלמנטים נוספים</h3>
+                    <div class="elements-grid">
+                        <div class="element-card" data-element="transition1">
+                            <div class="element-icon"><i class="fas fa-exchange-alt"></i></div>
+                            <div>אפקט מעבר 1</div>
+                        </div>
+                        <div class="element-card" data-element="transition2">
+                            <div class="element-icon"><i class="fas fa-exchange-alt"></i></div>
+                            <div>אפקט מעבר 2</div>
+                        </div>
+                        <div class="element-card" data-element="lower_third1">
+                            <div class="element-icon"><i class="fas fa-closed-captioning"></i></div>
+                            <div>כיתוב תחתון 1</div>
+                        </div>
+                        <div class="element-card" data-element="lower_third2">
+                            <div class="element-icon"><i class="fas fa-closed-captioning"></i></div>
+                            <div>כיתוב תחתון 2</div>
+                        </div>
+                        <div class="element-card" data-element="title_effect1">
+                            <div class="element-icon"><i class="fas fa-text-width"></i></div>
+                            <div>אפקט כותרת 1</div>
+                        </div>
+                        <div class="element-card" data-element="title_effect2">
+                            <div class="element-icon"><i class="fas fa-text-width"></i></div>
+                            <div>אפקט כותרת 2</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="mobile-nav">
+        <a href="#" class="nav-btn active" id="nav-home">
+            <i class="fas fa-home"></i>
+            <span>דף הבית</span>
+        </a>
+        <a href="#" class="nav-btn" id="nav-projects">
+            <i class="fas fa-project-diagram"></i>
+            <span>פרויקטים</span>
+        </a>
+        <a href="#" class="nav-btn" id="nav-templates">
+            <i class="fas fa-box-open"></i>
+            <span>תבניות</span>
+        </a>
+        <a href="#" class="nav-btn" id="nav-sidebar">
+            <i class="fas fa-bars"></i>
+            <span>תפריט</span>
+        </a>
+    </div>
+
+    <div class="modal" id="import-modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2><i class="fas fa-file-import"></i> ייבוא מייל חדש</h2>
+            
+            <div class="tabs">
+                <div class="tab active" data-tab="gmail">Gmail</div>
+                <div class="tab" data-tab="outlook">Outlook</div>
+            </div>
+            
+            <div id="gmail-tab" class="tab-content active">
+                <p>התחברות לחשבון Gmail שלך כדי לייבא מיילים:</p>
+                <button style="background-color: #EA4335; width: 100%; padding: 12px; font-size: 1em; margin-bottom: 15px;">
+                    <i class="fab fa-google"></i> התחבר עם Gmail
+                </button>
+            </div>
+            
+            <div id="outlook-tab" class="tab-content" style="display: none;">
+                <p>התחברות לחשבון Outlook שלך כדי לייבא מיילים:</p>
+                <button style="background-color: #0072C6; width: 100%; padding: 12px; font-size: 1em; margin-bottom: 15px;">
+                    <i class="fas fa-envelope"></i> התחבר עם Outlook
+                </button>
+            </div>
+            
+            <button class="btn-secondary" id="import-email" style="width: 100%; padding: 12px; font-size: 1em; margin-top: 15px;">
+                <i class="fas fa-file-import"></i> ייבא מייל
+            </button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // משתנים גלובליים
+            let currentCategory = 'breaking';
+            const githubRepo = 'https://github.com/orengamchi/after_effects_ai/blob/main/';
+            
+            // נתוני הבקשות
+            const requestsData = {
+                1: {
+                    title: "בקשה דחופה: עדכון גרפיקה לחדשות הערב",
+                    program: "חדשות הערב",
+                    sender: "דנה לוי (מפיקת תוכן)",
+                    date: "12/06/2023",
+                    time: "18:30",
+                    category: "breaking",
+                    content: `לצוות הגרפיקה היקר,
+
+יש לבצע עדכון דחוף לגרפיקה של חדשות הערב בעקבות נתוני הסקר האחרון שהתקבלו:
+1. עדכון תוצאות הסקר הפוליטי - קובץ מצורף
+2. הוספת נתוני אבטלה מעודכנים
+3. הכנת גרף השוואתי בין המפלגות
+4. הכנת אנימציה לנתוני האינפלציה
+
+נדרש להעלות את כל העדכונים לאפטר אפקטס עד השעה 18:00.
+
+פרטי הפרויקט:
+- שם הפרויקט: news_20230612_evening_politics
+- תיקייה: X:\\Projects\\News\\Evening\\2023-06-12
+- פורמט: HD 1080p 25fps
+- תבנית: SIMPLE_PIC_AI_TEST_V1.aep
+
+בתודה,
+דנה
+מפיקת תוכן
+חדשות הערב`,
+                    files: [
+                        { name: "survey_data_2023.xlsx", icon: "poll", size: "245 KB" },
+                        { name: "SIMPLE_PIC_AI_TEST_V1.aep", icon: "film", size: "2.4 MB" },
+                        { name: "bg1.jpg", icon: "image", size: "1.1 MB" }
+                    ],
+                    status: "urgent"
+                },
+                2: {
+                    title: "הכנת פתיח לתוכנית 'כלכלה עכשיו'",
+                    program: "כלכלה עכשיו",
+                    sender: "איתן כהן (מפיק ראשי)",
+                    date: "12/06/2023",
+                    time: "10:30",
+                    category: "economy",
+                    content: `לצוות הגרפיקה,
+
+נדרש פתיח חדש לתוכנית "כלכלה עכשיו" עם הנתונים המעודכנים:
+1. שערי מטבע מעודכנים
+2. מדדי שוק ההון העדכניים
+3. תחזית אינפלציה רבעונית
+
+החומרים המצורפים כוללים:
+- קובץ נתונים מעודכן מהבנק
+- לוגו התוכנית החדש
+- קובץ מוזיקת פתיח
+
+מועד אחרון להגשה: מחר, 13/06, עד 14:00.
+
+פרטי הפרויקט:
+- שם הפרויקט: economy_now_opener_202306
+- תיקייה: X:\\Projects\\Economy\\Openers\\2023-06
+- פורמט: HD 1080p 25fps
+- תבנית: template_news_economy_v4.aep
+
+תודה,
+איתן`,
+                    files: [
+                        { name: "market_data.xlsx", icon: "chart-line", size: "320 KB" },
+                        { name: "economy_now_logo.psd", icon: "image", size: "3.2 MB" },
+                        { name: "opener_music.mp3", icon: "music", size: "1.8 MB" }
+                    ],
+                    status: "medium"
+                },
+                3: {
+                    title: "אנימציות לפרק הספיישל 'תרבות הפנאי'",
+                    program: "תרבות הפנאי",
+                    sender: "מיכל אברהם (עורכת תוכן)",
+                    date: "11/06/2023",
+                    time: "16:45",
+                    category: "culture",
+                    content: `היי צוות הגרפיקה,
+
+לפרק הספיישל של "תרבות הפנאי" אנו זקוקים לאנימציות מעבר בין הקטעים:
+1. אנימציית פתיח לנושא המרכזי
+2. אנימציות מעבר בין קטעי התוכנית
+3. כותרות עם סגנון עיצובי תואם
+
+הפרק יעסוק ב:
+- פסטיבלי קיץ
+- תערוכות אמנות
+- מופעי תרבות
+
+נא להשתמש בפלטת הצבעים המצורפת.
+
+פרטי הפרויקט:
+- שם הפרויקט: culture_leisure_special_2023
+- תיקייה: X:\\Projects\\Culture\\Specials\\2023
+- פורמט: HD 1080p 25fps
+- תבנית: template_news_culture_v1.aep
+
+תודה מראש,
+מיכל`,
+                    files: [
+                        { name: "color_palette.pdf", icon: "palette", size: "450 KB" },
+                        { name: "art_exhibits.docx", icon: "file-word", size: "1.2 MB" },
+                        { name: "festival_logos.zip", icon: "file-archive", size: "4.5 MB" }
+                    ],
+                    status: "low"
+                },
+                4: {
+                    title: "עדכון תוצאות ליגת הכדורגל",
+                    program: "חדשות הספורט",
+                    sender: "דוד לוי (עורך ספורט)",
+                    date: "12/06/2023",
+                    time: "14:20",
+                    category: "sports",
+                    content: `צוות הגרפיקה היקר,
+
+יש לעדכן את טבלת ליגת הכדורגל עם תוצאות הסיבוב האחרון:
+1. עדכון מיקומי הקבוצות
+2. הוספת נתוני כובשים
+3. עדכון סטטיסטיקות קבוצתיות
+
+הנתונים המעודכנים מצורפים בקובץ אקסל.
+
+מועד הגשה: היום עד 17:00.
+
+פרטי הפרויקט:
+- שם הפרויקט: football_league_round_32
+- תיקייה: X:\\Projects\\Sports\\Football\\2023
+- פורמט: HD 1080p 25fps
+- תבנית: template_news_sports_v2.aep
+
+תודה,
+דוד`,
+                    files: [
+                        { name: "league_results_round32.xlsx", icon: "table", size: "180 KB" },
+                        { name: "team_logos", icon: "folder", size: "6.7 MB" }
+                    ],
+                    status: "medium"
+                },
+                5: {
+                    title: "תחזית מזג אוויר לסוף השבוע",
+                    program: "חדשות הבוקר",
+                    sender: "שירה כהן (מטאורולוגית)",
+                    date: "11/06/2023",
+                    time: "18:30",
+                    category: "weather",
+                    content: `לצוות הגרפיקה,
+
+נדרש עדכון לתחזית מזג האוויר לסוף השבוע עם הנתונים החדשים מהשירות המטאורולוגי:
+1. עדכון טמפרטורות צפויות
+2. תיקון אזורי גשם
+3. הוספת אזהרות חום כבד
+
+הנתונים המעודכנים מצורפים.
+
+פרטי הפרויקט:
+- שם הפרויקט: weather_forecast_weekend
+- תיקייה: X:\\Projects\\Weather\\2023\\06
+- פורמט: HD 1080p 25fps
+- תבנית: template_news_weather_v1.aep
+
+שירה`,
+                    files: [
+                        { name: "weather_data_20230611.csv", icon: "cloud-sun", size: "95 KB" },
+                        { name: "heat_warning.png", icon: "temperature-high", size: "850 KB" }
+                    ],
+                    status: "low"
+                },
+                6: {
+                    title: "דיווח מיוחד: אירוע ביטחוני",
+                    program: "חדשות הערב",
+                    sender: "אלון דוידוב (עורך חדשות)",
+                    date: "12/06/2023",
+                    time: "16:30",
+                    category: "breaking",
+                    content: `צוות הגרפיקה הדחוף,
+
+יש להכין גרפיקה מיוחדת לאירוע הביטחוני הנוכחי:
+1. מפת אזור האירוע
+2. ציר זמן אירועים
+3. פרופילי מעורבים
+
+החומרים הדרושים מצורפים.
+יש להקדים עדכון זה לכל המשימות האחרות.
+
+פרטי הפרויקט:
+- שם הפרויקט: breaking_security_event
+- תיקייה: X:\\Projects\\News\\Breaking\\2023-06-12
+- פורמט: HD 1080p 25fps
+- תבנית: template_news_breaking_v3.aep
+
+דחוף ביותר!
+אלון`,
+                    files: [
+                        { name: "event_map.pdf", icon: "map", size: "1.5 MB" },
+                        { name: "profiles.docx", icon: "user-tie", size: "2.1 MB" },
+                        { name: "timeline_data.xlsx", icon: "clock", size: "320 KB" }
+                    ],
+                    status: "urgent"
+                },
+                7: {
+                    title: "עדכון מדד המחירים לצרכן",
+                    program: "כלכלה עכשיו",
+                    sender: "נועה בר-אל (כלכלנית)",
+                    date: "12/06/2023",
+                    time: "09:15",
+                    category: "economy",
+                    content: `לצוות הגרפיקה,
+
+יש לעדכן את הגרפים עם נתוני האינפלציה החדשים שפורסמו הבוקר:
+1. עדכון גרף מדד המחירים
+2. השוואת מחירים לפי קטגוריות
+3. השוואה לשנים קודמות
+
+הנתונים המעודכנים מצורפים בקובץ.
+
+פרטי הפרויקט:
+- שם הפרויקט: cpi_update_june_2023
+- תיקייה: X:\\Projects\\Economy\\CPI\\2023
+- פורמט: HD 1080p 25fps
+- תבנית: template_news_economy_v4.aep
+
+נועה`,
+                    files: [
+                        { name: "cpi_data_june2023.xlsx", icon: "chart-pie", size: "420 KB" },
+                        { name: "price_comparison.pdf", icon: "file-pdf", size: "1.8 MB" }
+                    ],
+                    status: "medium"
+                },
+                8: {
+                    title: "הכנת גרפיקה לדיון בכנסת",
+                    program: "המגזין הפוליטי",
+                    sender: "יעל מור (עורכת פוליטית)",
+                    date: "11/06/2023",
+                    time: "20:10",
+                    category: "politics",
+                    content: `היי צוות הגרפיקה,
+
+נדרשת הכנת גרפיקה לדיון הצפוי בכנסת מחר בנושא הרפורמה המשפטית:
+1. תרשים זרימה של התהליך
+2. פרופילי חברי הכנסת המעורבים
+3. ציר זמן של האירועים
+
+יש להשתמש בלוגו הרשמי של הכנסת.
+
+פרטי הפרויקט:
+- שם הפרויקט: knesset_debate_legal_reform
+- תיקייה: X:\\Projects\\Politics\\Knesset\\2023
+- פורמט: HD 1080p 25fps
+- תבנית: template_news_politics_v3.aep
+
+יעל`,
+                    files: [
+                        { name: "knesset_logo.eps", icon: "landmark", size: "2.3 MB" },
+                        { name: "mk_profiles.docx", icon: "users", size: "3.1 MB" },
+                        { name: "reform_timeline.xlsx", icon: "history", size: "280 KB" }
+                    ],
+                    status: "medium"
+                },
+                9: {
+                    title: "פסטיבל הסרטים הבינלאומי",
+                    program: "תרבות הפנאי",
+                    sender: "עידן לוי (עורך תרבות)",
+                    date: "09/06/2023",
+                    time: "14:45",
+                    category: "culture",
+                    content: `לצוות הגרפיקה,
+
+יש להכין פתיח מיוחד לפסטיבל הסרטים הבינלאומי שיתקיים בחודש הבא:
+1. אנימציית פתיח עם סגנון קולנועי
+2. כותרות לסרטים המובילים
+3. גרפיקה לזוכי השנה שעברה
+
+החומרים כוללים לוגו הפסטיבל וקטעי וידאו.
+
+פרטי הפרויקט:
+- שם הפרויקט: intl_film_festival_2023
+- תיקייה: X:\\Projects\\Culture\\FilmFestival\\2023
+- פורמט: HD 1080p 25fps
+- תבנית: template_news_culture_v1.aep
+
+עידן`,
+                    files: [
+                        { name: "festival_logo.ai", icon: "film", size: "5.6 MB" },
+                        { name: "trailer_clips", icon: "folder", size: "12.4 MB" },
+                        { name: "winners_list.pdf", icon: "trophy", size: "1.2 MB" }
+                    ],
+                    status: "low"
+                },
+                10: {
+                    title: "אולימפיאדת פריז 2024",
+                    program: "חדשות הספורט",
+                    sender: "רון שטיין (עורך ספורט)",
+                    date: "07/06/2023",
+                    time: "11:30",
+                    category: "sports",
+                    content: `צוות הגרפיקה היקר,
+
+הכנת גרפיקה לקראת האולימפיאדה הקרובה בפריז:
+1. ספירת מטה לאירוע
+2. פרופילי ספורטאים ישראלים
+3. תחרויות המפתח
+
+יש להשתמש בלוגו הרשמי של האולימפיאדה.
+
+פרטי הפרויקט:
+- שם הפרויקט: paris_olympics_2024_preview
+- תיקייה: X:\\Projects\\Sports\\Olympics\\2024
+- פורמט: HD 1080p 25fps
+- תבנית: template_news_sports_v2.aep
+
+רון`,
+                    files: [
+                        { name: "olympics_logo.eps", icon: "medal", size: "3.8 MB" },
+                        { name: "athlete_profiles.docx", icon: "running", size: "2.9 MB" },
+                        { name: "event_schedule.xlsx", icon: "calendar", size: "520 KB" }
+                    ],
+                    status: "medium"
+                },
+                11: {
+                    title: "עדכון גרפי טמפרטורות",
+                    program: "חדשות הבוקר",
+                    sender: "שירה כהן (מטאורולוגית)",
+                    date: "05/06/2023",
+                    time: "16:20",
+                    category: "weather",
+                    content: `לצוות הגרפיקה,
+
+יש לעדכן את גרפי הטמפרטורות לחודש יולי עם הנתונים החדשים:
+1. ממוצעים חודשיים
+2. השוואה לשנים קודמות
+3. אזורי חום קיצוני
+
+הנתונים מצורפים בקובץ.
+
+פרטי הפרויקט:
+- שם הפרויקט: temperature_update_july
+- תיקייה: X:\\Projects\\Weather\\2023\\07
+- פורמט: HD 1080p 25fps
+- תבנית: template_news_weather_v1.aep
+
+שירה`,
+                    files: [
+                        { name: "july_temps_2023.csv", icon: "temperature-low", size: "120 KB" },
+                        { name: "heat_map_data.xlsx", icon: "map-marked-alt", size: "450 KB" }
+                    ],
+                    status: "low"
+                },
+                12: {
+                    title: "דיווח מיוחד: אסון טבע",
+                    program: "חדשות הערב",
+                    sender: "אלון דוידוב (עורך חדשות)",
+                    date: "12/06/2023",
+                    time: "15:00",
+                    category: "breaking",
+                    content: `צוות הגרפיקה הדחוף,
+
+יש להכין גרפיקה מיוחדת לאירוע הטבע הקשה שהתרחש:
+1. מפת האזור הנפגע
+2. ציר זמן האירוע
+3. נתוני נזק ראשוניים
+
+החומרים הדרושים מצורפים.
+יש להקדים עדכון זה לכל המשימות האחרות.
+
+פרטי הפרויקט:
+- שם הפרויקט: breaking_natural_disaster
+- תיקייה: X:\\Projects\\News\\Breaking\\2023-06-12
+- פורמט: HD 1080p 25fps
+- תבנית: template_news_breaking_v3.aep
+
+דחוף ביותר!
+אלון`,
+                    files: [
+                        { name: "disaster_area_map.pdf", icon: "map", size: "2.8 MB" },
+                        { name: "damage_assessment.xlsx", icon: "building", size: "780 KB" },
+                        { name: "timeline_events.docx", icon: "clock", size: "1.2 MB" }
+                    ],
+                    status: "urgent"
+                },
+                13: {
+                    title: "עדכון שערי מטבע חוץ",
+                    program: "כלכלה עכשיו",
+                    sender: "נועה בר-אל (כלכלנית)",
+                    date: "12/06/2023",
+                    time: "11:45",
+                    category: "economy",
+                    content: `לצוות הגרפיקה,
+
+יש לעדכן את גרפי שערי המטבע עם הנתונים המעודכנים:
+1. דולר, יורו ולירה שטרלינג
+2. השוואה שבועית
+3. תחזית לשבוע הקרוב
+
+הנתונים המעודכנים מצורפים.
+
+פרטי הפרויקט:
+- שם הפרויקט: forex_update_june12
+- תיקייה: X:\\Projects\\Economy\\Forex\\2023
+- פורמט: HD 1080p 25fps
+- תבנית: template_news_economy_v4.aep
+
+נועה`,
+                    files: [
+                        { name: "forex_rates_june12.xlsx", icon: "money-bill-wave", size: "310 KB" },
+                        { name: "currency_trends.pdf", icon: "chart-line", size: "1.5 MB" }
+                    ],
+                    status: "medium"
+                }
+            };
+            
+            // אתחול אוטומציות
+            updateAutomationOptions(currentCategory);
+            
+            // טיפול בבחירת בקשה מהתפריט
+            document.querySelectorAll('.email-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    // הסרת סימון פעיל מכל הפריטים
+                    document.querySelectorAll('.email-item').forEach(el => el.classList.remove('active'));
+                    // סימון הפריט הנוכחי כפעיל
+                    this.classList.add('active');
+                    
+                    // טעינת נתוני הבקשה הנבחרת
+                    const requestId = parseInt(this.getAttribute('data-request'));
+                    loadRequestData(requestId);
+                });
+            });
+            
+            // טעינת נתוני בקשה לפי ID
+            function loadRequestData(requestId) {
+                const request = requestsData[requestId];
+                if (!request) return;
+                
+                // עדכון כותרת ראשית
+                document.querySelector('.main-content h2').innerHTML = 
+                    `${request.title} <span class="program-badge">${request.program}</span>`;
+                
+                // עדכון פרטי הבקשה
+                document.querySelector('.main-content .status-badge').className = 
+                    `status-badge status-${request.status === 'urgent' ? 'urgent' : request.status === 'medium' ? 'in-progress' : 'new'}`;
+                document.querySelector('.main-content .status-badge').textContent = 
+                    request.status === 'urgent' ? 'דחוף!' : request.status === 'medium' ? 'בטיפול' : 'חדש';
+                
+                // עדכון פרטי השולח וזמן
+                const infoHtml = `
+                    <div><i class="fas fa-user"></i> נשלח מאת: ${request.sender}</div>
+                    <div><i class="fas fa-clock"></i> תאריך: ${request.date} | זמן הגשה: ${request.time}</div>
+                    <div><i class="fas fa-tag"></i> קטגוריה: <span class="category-badge ${request.category}" id="current-category">${getCategoryName(request.category)}</span></div>
+                `;
+                document.querySelector('.main-content .card > div:nth-child(2)').innerHTML = infoHtml;
+                
+                // עדכון תוכן הבקשה
+                document.getElementById('request-content').value = request.content;
+                
+                // עדכון קבצים מצורפים
+                const filesContainer = document.getElementById('file-list');
+                filesContainer.innerHTML = '';
+                request.files.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.innerHTML = `
+                        <div class="file-icon"><i class="fas fa-${file.icon}"></i></div>
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${file.size}</div>
+                    `;
+                    filesContainer.appendChild(fileItem);
+                });
+                
+                // עדכון קטגוריה נוכחית
+                currentCategory = request.category;
+                updateAutomationOptions(currentCategory);
+                
+                // עדכון נתונים שחולצו אוטומטית
+                updateExtractedData(request);
+            }
+            
+            // עדכון הנתונים שחולצו אוטומטית לפי הבקשה
+            function updateExtractedData(request) {
+                const dataGrid = document.querySelector('.data-grid');
+                dataGrid.innerHTML = '';
+                
+                // יצירת פריטי נתונים לפי סוג הבקשה
+                if (request.category === 'breaking') {
+                    addDataItem('סוג הבקשה:', 'חדשות דחופות');
+                    addDataItem('דחיפות:', request.status === 'urgent' ? 'גבוהה' : 'בינונית');
+                    addDataItem('תאריך אירוע:', 'היום');
+                } else if (request.category === 'economy') {
+                    addDataItem('סוג הבקשה:', 'דוח כלכלי');
+                    addDataItem('נושא:', request.title.includes('מדד') ? 'מדד מחירים' : 
+                              request.title.includes('שערי') ? 'מטבע חוץ' : 'כללי');
+                    addDataItem('תאריך פרסום:', request.date);
+                } else if (request.category === 'politics') {
+                    addDataItem('סוג הבקשה:', 'נושא פוליטי');
+                    addDataItem('מוסד:', request.content.includes('כנסת') ? 'הכנסת' : 'ממשלתי');
+                    addDataItem('דחיפות:', request.status === 'urgent' ? 'גבוהה' : 'בינונית');
+                } else {
+                    addDataItem('סוג הבקשה:', getCategoryName(request.category));
+                    addDataItem('תאריך אירוע:', request.date);
+                    addDataItem('דחיפות:', request.status === 'urgent' ? 'גבוהה' : 
+                              request.status === 'medium' ? 'בינונית' : 'נמוכה');
+                }
+                
+                // הוספת פרטי פרויקט אם קיימים
+                const projectMatch = request.content.match(/שם הפרויקט:\s*(.+)/);
+                if (projectMatch) {
+                    addDataItem('שם הפרויקט:', projectMatch[1].trim());
+                }
+                
+                const folderMatch = request.content.match(/תיקייה:\s*(.+)/);
+                if (folderMatch) {
+                    addDataItem('תיקיית יעד:', folderMatch[1].trim());
+                }
+                
+                const templateMatch = request.content.match(/תבנית:\s*(.+)/);
+                if (templateMatch) {
+                    addDataItem('תבנית After Effects:', templateMatch[1].trim());
+                }
+                
+                const deadlineMatch = request.content.match(/עד השעה\s*(.+)/) || 
+                                     request.content.match(/מועד אחרון.*?(\d{2}:\d{2})/);
+                if (deadlineMatch) {
+                    addDataItem('דדליין:', deadlineMatch[1].trim());
+                }
+                
+                function addDataItem(label, value) {
+                    const item = document.createElement('div');
+                    item.className = 'data-item';
+                    item.innerHTML = `
+                        <div class="data-label">${label}</div>
+                        <div class="data-value">${value}</div>
+                    `;
+                    dataGrid.appendChild(item);
+                }
+            }
+            
+            // פונקציות לניהול קטגוריות
+            function updateCurrentCategory(category) {
+                currentCategory = category;
+                document.getElementById('current-category').textContent = getCategoryName(category);
+                document.getElementById('current-category').className = `category-badge ${category}`;
+                updateAutomationOptions(category);
+            }
+            
+            function getCategoryName(category) {
+                const names = {
+                    'breaking': 'חדשות דחופות',
+                    'politics': 'פוליטיקה',
+                    'economy': 'כלכלה',
+                    'sports': 'ספורט',
+                    'culture': 'תרבות',
+                    'weather': 'מזג אוויר'
+                };
+                return names[category] || 'כללי';
+            }
+            
+            // עדכון אופציות אוטומציה לפי קטגוריה
+            function updateAutomationOptions(category) {
+                const options = {
+                    'breaking': [
+                        { icon: 'folder-plus', title: 'טעינת תבנית', desc: 'טעינת תבנית מ-GitHub' },
+                        { icon: 'exclamation-triangle', title: 'כותרות דחופות', desc: 'יצירת כותרות עם אפקטים' },
+                        { icon: 'bolt', title: 'אנימציות דחיפות', desc: 'הוספת אנימציות דחופות' },
+                        { icon: 'stopwatch', title: 'הגדלת מהירות', desc: 'הגדלת מהירות רנדור' },
+                        { icon: 'text-height', title: 'כיתוב תחתון', desc: 'הוספת כיתוב תחתון' },
+                        { icon: 'palette', title: 'צבעי דחיפות', desc: 'החלפת צבעים לצבעי דחיפות' }
+                    ],
+                    'politics': [
+                        { icon: 'folder-plus', title: 'טעינת תבנית', desc: 'טעינת תבנית מ-GitHub' },
+                        { icon: 'chart-bar', title: 'יצירת גרפים', desc: 'המרת נתונים לגרפים' },
+                        { icon: 'users', title: 'עדכון פוליטיקאים', desc: 'הוספת נתוני פוליטיקאים' },
+                        { icon: 'flag', title: 'סמלי מפלגות', desc: 'הוספת סמלי מפלגות' },
+                        { icon: 'percentage', title: 'אחוזי הצבעה', desc: 'עדכון אחוזי הצבעה' }
+                    ],
+                    'economy': [
+                        { icon: 'folder-plus', title: 'טעינת תבנית', desc: 'טעינת תבנית מ-GitHub' },
+                        { icon: 'chart-line', title: 'גרפי מגמות', desc: 'יצירת גרפי מגמות כלכליות' },
+                        { icon: 'money-bill-wave', title: 'עדכון שערים', desc: 'עדכון שערי מטבע' },
+                        { icon: 'calculator', title: 'חישובים', desc: 'חישובים אוטומטיים' }
+                    ],
+                    'sports': [
+                        { icon: 'folder-plus', title: 'טעינת תבנית', desc: 'טעינת תבנית מ-GitHub' },
+                        { icon: 'running', title: 'תוצאות משחקים', desc: 'עדכון תוצאות משחקים' },
+                        { icon: 'medal', title: 'טבלת ליגה', desc: 'עדכון טבלת ליגה' }
+                    ],
+                    'culture': [
+                        { icon: 'folder-plus', title: 'טעינת תבנית', desc: 'טעינת תבנית מ-GitHub' },
+                        { icon: 'theater-masks', title: 'אנימציות תרבות', desc: 'הוספת אנימציות תרבות' },
+                        { icon: 'music', title: 'אפקטים קוליים', desc: 'הוספת אפקטים קוליים' }
+                    ],
+                    'weather': [
+                        { icon: 'folder-plus', title: 'טעינת תבנית', desc: 'טעינת תבנית מ-GitHub' },
+                        { icon: 'temperature-low', title: 'גרפי טמפרטורה', desc: 'יצירת גרפי טמפרטורה' },
+                        { icon: 'cloud-rain', title: 'מפת משקעים', desc: 'עדכון מפת משקעים' }
+                    ]
+                };
+                
+                const automationOptions = options[category] || options.breaking;
+                const container = document.getElementById('automation-options');
+                container.innerHTML = '';
+                
+                automationOptions.forEach(opt => {
+                    const card = document.createElement('div');
+                    card.className = 'automation-card selected';
+                    card.setAttribute('data-category', category);
+                    card.innerHTML = `
+                        <div class="automation-icon"><i class="fas fa-${opt.icon}"></i></div>
+                        <h4>${opt.title}</h4>
+                        <p>${opt.desc}</p>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+            
+            // טיפול בתבניות מה-GitHub
+            document.querySelectorAll('.template-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const templateName = this.getAttribute('data-template');
+                    document.getElementById('ae-template').value = templateName;
+                    
+                    if (templateName === 'SIMPLE_PIC_AI_TEST_V1.aep') {
+                        alert('תבנית AI נבחרה. יש לוודא שהורדת את הקובץ מ-GitHub');
+                    }
+                });
+            });
+            
+            // טיפול בתמונות רקע מה-GitHub
+            document.querySelectorAll('[data-bg]').forEach(item => {
+                item.addEventListener('click', function() {
+                    const bgName = this.getAttribute('data-bg');
+                    const bgUrl = `${githubRepo}${bgName}?raw=true`;
+                    
+                    const preview = document.querySelector('.ae-preview');
+                    preview.innerHTML = `
+                        <img src="${bgUrl}" style="max-width:100%; max-height:100%;">
+                        <div style="position:absolute; bottom:10px; right:10px; background:rgba(0,0,0,0.7); padding:2px 5px; border-radius:3px; font-size:0.8em;">
+                            ${bgName}
+                        </div>
+                    `;
+                });
+            });
+            
+            // טיפול באלמנטים נוספים
+            document.querySelectorAll('[data-element]').forEach(item => {
+                item.addEventListener('click', function() {
+                    const elementName = this.getAttribute('data-element');
+                    alert(`אלמנט ${elementName} נבחר. ניתן להוסיף אותו לפרויקט.`);
+                });
+            });
+            
+            // יצירת סקריפט AE
+            document.getElementById('generate-script').addEventListener('click', function() {
+                const projectData = {
+                    name: document.getElementById('project-name').value,
+                    folder: document.getElementById('project-folder').value,
+                    template: document.getElementById('ae-template').value,
+                    format: document.getElementById('output-format').value,
+                    category: currentCategory
+                };
+                
+                const scriptContent = generateAEScript(projectData);
+                document.getElementById('script-content').textContent = scriptContent;
+                document.getElementById('script-output-container').style.display = 'block';
+            });
+            
+            function generateAEScript(data) {
+                const isGitHubTemplate = data.template === 'SIMPLE_PIC_AI_TEST_V1.aep';
+                
+                let templateCode = '';
+                if (isGitHubTemplate) {
+                    templateCode = `// תבנית מה-GitHub
+var templateFile = new File("${data.folder}/SIMPLE_PIC_AI_TEST_V1.aep");
+if (!templateFile.exists) {
+    alert("יש להוריד את התבנית מהקישור: ${githubRepo}SIMPLE_PIC_AI_TEST_V1.aep");
+    throw new Error("התבנית לא נמצאה");
+}
+app.open(templateFile);`;
+                } else {
+                    templateCode = `// טעינת תבנית סטנדרטית
+var templateFile = new File("Templates/${data.template}");
+app.open(templateFile);`;
+                }
+                
+                return `// סקריפט ל-After Effects
+// נוצר אוטומטית על ידי מערכת הניהול
+
+// פרטי הפרויקט:
+// שם: ${data.name}
+// קטגוריה: ${getCategoryName(data.category)}
+// פורמט: ${data.format}
+
+${templateCode}
+
+// יצירת קומפוזיציה חדשה
+var comp = app.project.items.addComp(
+    "${data.name}", 
+    1920, 
+    1080, 
+    1, 
+    10, // duration in seconds
+    25  // fps
+);
+
+// הוספת שכבות לפי הקטגוריה
+${getCategoryLayers(data.category)}
+
+// שמירת הפרויקט
+var saveFile = new File("${data.folder}/${data.name}.aep");
+app.project.save(saveFile);
+
+alert("הפרויקט נוצר בהצלחה!");
+
+function ${isGitHubTemplate ? 'loadGitHubTemplate()' : 'loadStandardTemplate()'} {
+    // פונקציות עזר לטעינת תבניות
+    return true;
+}`;
+            }
+            
+            function getCategoryLayers(category) {
+                if (category === 'breaking') {
+                    return `// שכבות לחדשות דחופות
+var bgLayer = comp.layers.addSolid([0.9, 0.1, 0.1], "רקע דחוף", 1920, 1080);
+var titleLayer = comp.layers.addText("חדשות דחופות");
+titleLayer.property("Position").setValue([960, 300]);
+
+// הוספת אפקטים מיוחדים
+var effects = titleLayer.property("ADBE Effect Parade");
+effects.addProperty("ADBE Drop Shadow");
+effects.addProperty("ADBE Glow");`;
+                } else if (category === 'politics') {
+                    return `// שכבות לפוליטיקה
+var bgLayer = comp.layers.addSolid([0.2, 0.2, 0.4], "רקע פוליטיקה", 1920, 1080);
+var chartLayer = comp.layers.addNull();
+chartLayer.name = "גרף תוצאות";
+
+// הוספת גרפים
+var chartEffects = chartLayer.property("ADBE Effect Parade");
+chartEffects.addProperty("ADBE Data Visualization");`;
+                } else if (category === 'economy') {
+                    return `// שכבות לכלכלה
+var bgLayer = comp.layers.addSolid([0.1, 0.3, 0.2], "רקע כלכלה", 1920, 1080);
+var graphLayer = comp.layers.addShape();
+graphLayer.name = "גרף כלכלי";
+
+// הוספת גרפים כלכליים
+var graphEffects = graphLayer.property("ADBE Effect Parade");
+graphEffects.addProperty("ADBE Graph");`;
+                } else if (category === 'sports') {
+                    return `// שכבות לספורט
+var bgLayer = comp.layers.addSolid([0.2, 0.1, 0.1], "רקע ספורט", 1920, 1080);
+var scoreLayer = comp.layers.addText("תוצאות");
+scoreLayer.property("Position").setValue([960, 300]);
+
+// הוספת אנימציות ספורט
+var animEffects = scoreLayer.property("ADBE Effect Parade");
+animEffects.addProperty("ADBE Motion Blur");`;
+                } else if (category === 'culture') {
+                    return `// שכבות לתרבות
+var bgLayer = comp.layers.addSolid([0.3, 0.1, 0.3], "רקע תרבות", 1920, 1080);
+var titleLayer = comp.layers.addText("תרבות");
+titleLayer.property("Position").setValue([960, 300]);
+
+// הוספת אפקטים תרבותיים
+var effects = titleLayer.property("ADBE Effect Parade");
+effects.addProperty("ADBE Glow");`;
+                } else if (category === 'weather') {
+                    return `// שכבות למזג אוויר
+var bgLayer = comp.layers.addSolid([0.1, 0.3, 0.5], "רקע מזג אוויר", 1920, 1080);
+var tempLayer = comp.layers.addText("טמפרטורה");
+tempLayer.property("Position").setValue([960, 300]);
+
+// הוספת אפקטים מטאורולוגיים
+var effects = tempLayer.property("ADBE Effect Parade");
+effects.addProperty("ADBE Turbulent Displace");`;
+                } else {
+                    return `// שכבות כלליות
+var bgLayer = comp.layers.addSolid([0.2, 0.2, 0.2], "רקע כללי", 1920, 1080);
+var titleLayer = comp.layers.addText("כותרת");
+titleLayer.property("Position").setValue([960, 300]);`;
+                }
+            }
+            
+            // הורדת הסקריפט
+            document.getElementById('download-script').addEventListener('click', function() {
+                const content = document.getElementById('script-content').textContent;
+                const blob = new Blob([content], { type: 'application/javascript' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ae_script_${Date.now()}.jsx`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+            
+            // ניהול שלבי העבודה
+            document.getElementById('start-task').addEventListener('click', function() {
+                const step = this.closest('.step');
+                step.classList.remove('current');
+                step.classList.add('completed');
+                
+                const nextStep = step.nextElementSibling;
+                if (nextStep && nextStep.classList.contains('step')) {
+                    nextStep.classList.add('current');
+                    nextStep.classList.remove('locked');
+                }
+            });
+            
+            // ניהול סרגל צד למובייל
+            document.getElementById('nav-sidebar').addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('sidebar').classList.toggle('active');
+            });
+            
+            // ניתוח תוכן הבקשה והצעת תבניות
+            function analyzeRequestContent() {
+                const content = document.getElementById('request-content').value.toLowerCase();
+                const suggestions = [];
+                
+                if (content.includes('סקר') || content.includes('פוליטי')) {
+                    suggestions.push('template_news_politics_v3.aep');
+                }
+                if (content.includes('אבטלה') || content.includes('כלכל')) {
+                    suggestions.push('template_news_economy_v4.aep');
+                }
+                if (content.includes('אנימציה')) {
+                    suggestions.push('template_news_transition_v1.aep');
+                }
+                if (content.includes('דחוף')) {
+                    suggestions.push('template_news_breaking_v3.aep');
+                }
+                
+                if (suggestions.length > 0) {
+                    alert(`לפי תוכן הבקשה, מומלץ להשתמש בתבניות: ${suggestions.join(', ')}`);
+                }
+            }
+            
+            // לחצן בדיקה לשונית
+            document.getElementById('validate-text').addEventListener('click', function() {
+                alert('הטקסט נבדק ואושר לשונית על ידי המערכת');
+                this.classList.add('completed');
+                this.innerHTML = '<i class="fas fa-check-circle"></i> אושר לשונית';
+            });
+            
+            // לחצן סימון כבקשה חריגה
+            document.getElementById('mark-exception').addEventListener('click', function() {
+                alert('הבקשה סומנה כחריגה ותועבר לטיפול מיוחד');
+                this.classList.add('completed');
+                this.innerHTML = '<i class="fas fa-exclamation-triangle"></i> בקשה חריגה';
+            });
+            
+            // לחצן דחוף
+            document.getElementById('push-request').addEventListener('click', function() {
+                alert('הבקשה סומנה כדחופה ותקבל עדיפות בטיפול');
+                this.classList.add('completed');
+                this.innerHTML = '<i class="fas fa-bolt"></i> סומן כדחוף';
+            });
+            
+            // ניתוח אוטומטי של תוכן הבקשה בעת טעינת הדף
+            analyzeRequestContent();
+            
+            // טיפול בלחצני ייבוא מייל
+            document.getElementById('import-outlook').addEventListener('click', function() {
+                document.getElementById('import-modal').style.display = 'flex';
+                document.querySelector('.tab[data-tab="outlook"]').click();
+            });
+            
+            document.getElementById('import-gmail').addEventListener('click', function() {
+                document.getElementById('import-modal').style.display = 'flex';
+                document.querySelector('.tab[data-tab="gmail"]').click();
+            });
+            
+            // טיפול בטאבים של המודל
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // הסרת סימון מכל הטאבים
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    // הוספת סימון לטאב הנוכחי
+                    this.classList.add('active');
+                    
+                    // הסתרת כל תוכן הטאבים
+                    document.querySelectorAll('.tab-content').forEach(content => {
+                        content.style.display = 'none';
+                    });
+                    
+                    // הצגת תוכן הטאב הנבחר
+                    document.getElementById(`${tabId}-tab`).style.display = 'block';
+                });
+            });
+            
+            // סגירת מודל
+            document.querySelector('.close-modal').addEventListener('click', function() {
+                document.getElementById('import-modal').style.display = 'none';
+            });
+            
+            // לחיצה מחוץ לתוכן המודל לסגירה
+            document.getElementById('import-modal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.style.display = 'none';
+                }
+            });
+            
+            // לחצן ייבוא מייל
+            document.getElementById('import-email').addEventListener('click', function() {
+                alert('המייל יובא בהצלחה למערכת');
+                document.getElementById('import-modal').style.display = 'none';
+            });
+            
+            // טיפול בלחיצה על אזור גרירה ושחרור
+            const dragDropArea = document.getElementById('drag-drop-area');
+            const fileInput = document.getElementById('file-input');
+            
+            dragDropArea.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener('change', function() {
+                handleFiles(this.files);
+            });
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dragDropArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dragDropArea.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dragDropArea.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                dragDropArea.classList.add('active');
+            }
+            
+            function unhighlight() {
+                dragDropArea.classList.remove('active');
+            }
+            
+            dragDropArea.addEventListener('drop', function(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            });
+            
+            function handleFiles(files) {
+                const fileList = document.getElementById('file-list');
+                fileList.innerHTML = '';
+                
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    
+                    // קביעת אייקון לפי סוג הקובץ
+                    let icon = 'file';
+                    if (file.type.startsWith('image/')) {
+                        icon = 'image';
+                    } else if (file.type.startsWith('video/')) {
+                        icon = 'film';
+                    } else if (file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv')) {
+                        icon = 'table';
+                    } else if (file.type.includes('pdf')) {
+                        icon = 'file-pdf';
+                    } else if (file.type.includes('zip') || file.type.includes('compressed')) {
+                        icon = 'file-archive';
+                    } else if (file.type.includes('audio')) {
+                        icon = 'music';
+                    }
+                    
+                    // פורמט גודל הקובץ
+                    let size = '';
+                    if (file.size < 1024) {
+                        size = file.size + ' B';
+                    } else if (file.size < 1024 * 1024) {
+                        size = (file.size / 1024).toFixed(1) + ' KB';
+                    } else {
+                        size = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+                    }
+                    
+                    fileItem.innerHTML = `
+                        <div class="file-icon"><i class="fas fa-${icon}"></i></div>
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${size}</div>
+                    `;
+                    fileList.appendChild(fileItem);
+                }
+            }
+            
+            // טיפול בלחצן הפעלת אוטומציות
+            document.getElementById('run-automation').addEventListener('click', function() {
+                const selectedAutomations = document.querySelectorAll('.automation-card.selected');
+                if (selectedAutomations.length === 0) {
+                    alert('נא לבחור לפחות אוטומציה אחת להפעלה');
+                    return;
+                }
+                
+                const automationNames = Array.from(selectedAutomations).map(el => 
+                    el.querySelector('h4').textContent
+                ).join(', ');
+                
+                alert(`האוטומציות הבאות מופעלות: ${automationNames}`);
+                
+                // סימון השלב הנוכחי כהושלם
+                const currentStep = document.querySelector('.step.current');
+                currentStep.classList.remove('current');
+                currentStep.classList.add('completed');
+                
+                // מעבר לשלב הבא
+                const nextStep = currentStep.nextElementSibling;
+                if (nextStep && nextStep.classList.contains('step')) {
+                    nextStep.classList.add('current');
+                    nextStep.classList.remove('locked');
+                }
+            });
+            
+            // טיפול בלחצן פתיחת After Effects
+            document.getElementById('open-ae').addEventListener('click', function() {
+                alert('After Effects נפתח עם הפרויקט המוגדר');
+            });
+            
+            // טיפול בלחצן שמור הגדרות
+            document.getElementById('save-settings').addEventListener('click', function() {
+                alert('הגדרות הפרויקט נשמרו בהצלחה');
+            });
+            
+            // טיפול בלחצן עיון בתיקייה
+            document.getElementById('browse-folder').addEventListener('click', function() {
+                alert('פתיחת חלון בחירת תיקייה');
+            });
+            
+            // טיפול בלחצני ניווט למובייל
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // הסרת סימון מכל הכפתורים
+                    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                    
+                    // סימון הכפתור הנוכחי
+                    this.classList.add('active');
+                    
+                    // טיפול בהתאם ללחצן שנבחר
+                    const id = this.id;
+                    if (id === 'nav-home') {
+                        // גלילה לראש הדף
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    } else if (id === 'nav-projects') {
+                        // גלילה לקטע הפרויקטים
+                        document.querySelector('.progress-steps').scrollIntoView({ behavior: 'smooth' });
+                    } else if (id === 'nav-templates') {
+                        // גלילה לקטע התבניות
+                        document.querySelector('.broadcast-elements').scrollIntoView({ behavior: 'smooth' });
+                    }
+                });
+            });
+            
+            // טיפול בלחצני בקרה בתצוגה מקדימה
+            document.querySelectorAll('.ae-control-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const icon = this.querySelector('i');
+                    if (icon.classList.contains('fa-play')) {
+                        alert('התצוגה המקדימה מתחילה לנגן');
+                    } else if (icon.classList.contains('fa-pause')) {
+                        alert('התצוגה המקדימה מושהת');
+                    } else if (icon.classList.contains('fa-stop')) {
+                        alert('התצוגה המקדימה נעצרה');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

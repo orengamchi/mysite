@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>חלל תלת־ממדי עם ערפיליות נוצצות</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet">
+  <style>
+    html, body { margin:0; padding:0; overflow:hidden; background:#000; }
+    canvas { display:block; }
+    #hud {
+      position:absolute; top:10px; left:50%;
+      transform:translateX(-50%);
+      color:#FFD700; font-family:'Orbitron',monospace;
+      font-size:16px; text-shadow:0 0 5px #FFD700;
+      white-space:nowrap; z-index:100;
+    }
+  </style>
+</head>
+<body>
+  <div id="hud"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.min.js"></script>
+  <script>
+    // HUD: מונה אחורני עד 1.1.2136
+    const hud = document.getElementById('hud');
+    const target = new Date('2136-01-01T00:00:00Z').getTime();
+    function updateHUD() {
+      let diff = Math.max(target - Date.now(), 0);
+      const sec = 1000, min = 60*sec, hr = 60*min, day = 24*hr, yr = 365*day;
+      let Y = Math.floor(diff/yr); diff%=yr;
+      let D = Math.floor(diff/day); diff%=day;
+      let H = Math.floor(diff/hr); diff%=hr;
+      let M = Math.floor(diff/min); diff%=min;
+      let S = Math.floor(diff/sec);
+      hud.textContent = `${Y}y ${D}d ${H}h ${M}m ${S}s עד 2136`;
+    }
+    setInterval(updateHUD, 1000);
+    updateHUD();
+
+    // רגישות מובייל
+    let orientBeta=45, orientGamma=0;
+    window.addEventListener('deviceorientation', e=>{
+      orientBeta  = e.beta  || orientBeta;
+      orientGamma = e.gamma || orientGamma;
+    });
+
+    // Scene / Camera / Renderer
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x000010, 0.0015);
+    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 500);
+    const renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+    window.addEventListener('resize', ()=>{
+      camera.aspect = innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    // Controls
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.enableZoom = false;
+    controls.enablePan = false;
+    controls.rotateSpeed = 2.0;
+    controls.minAzimuthAngle = -Infinity;
+    controls.maxAzimuthAngle = Infinity;
+    controls.minPolarAngle = 0;
+    controls.maxPolarAngle = Math.PI;
+
+    // Stars background
+    {
+      const geo = new THREE.BufferGeometry();
+      const cnt = 20000, pos = new Float32Array(cnt*3);
+      for(let i=0;i<cnt;i++){
+        const r=200, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+        pos[3*i]   = r*Math.sin(ph)*Math.cos(th);
+        pos[3*i+1] = r*Math.sin(ph)*Math.sin(th);
+        pos[3*i+2] = r*Math.cos(ph);
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+      scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+        color:0x8888ff, size:0.5, transparent:true, opacity:0.7
+      })));
+    }
+
+    // Volumetric nebula spheres
+    const nebulaGroup = new THREE.Group();
+    for(let i=0;i<8;i++){
+      const mat = new THREE.MeshBasicMaterial({
+        color: new THREE.Color().setHSL(0.6 + Math.random()*0.1, 0.5, 0.2),
+        transparent: true, opacity: 0.05,
+        blending: THREE.AdditiveBlending, depthWrite:false, side:THREE.BackSide
+      });
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(100 + Math.random()*20, 32, 32),
+        mat
+      );
+      mesh.position.set((Math.random()-0.5)*50, (Math.random()-0.5)*50, (Math.random()-0.5)*50);
+      nebulaGroup.add(mesh);
+    }
+    scene.add(nebulaGroup);
+
+    // Sparkling particle clouds in nebula
+    const sparkleGroup = new THREE.Group();
+    const sparkleGeo = new THREE.BufferGeometry();
+    const sparkleCount = 5000;
+    const sparklePos = new Float32Array(sparkleCount*3);
+    for(let i=0;i<sparkleCount;i++){
+      const r = 80 + Math.random()*40;
+      const th = Math.random()*Math.PI*2, ph = Math.acos(2*Math.random()-1);
+      sparklePos[3*i]   = r*Math.sin(ph)*Math.cos(th);
+      sparklePos[3*i+1] = r*Math.sin(ph)*Math.sin(th);
+      sparklePos[3*i+2] = r*Math.cos(ph);
+    }
+    sparkleGeo.setAttribute('position', new THREE.BufferAttribute(sparklePos,3));
+    const sparkleMat = new THREE.PointsMaterial({
+      color:0xffffff, size:0.5, transparent:true, opacity:0.6, blending:THREE.AdditiveBlending
+    });
+    const sparkles = new THREE.Points(sparkleGeo, sparkleMat);
+    sparkleGroup.add(sparkles);
+    scene.add(sparkleGroup);
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0x2233ff, 0.5));
+    const sunLight = new THREE.PointLight(0xffaa33, 5, 300);
+    scene.add(sunLight);
+
+    // Sun core
+    const sunGroup = new THREE.Group();
+    scene.add(sunGroup);
+    const sunCore = new THREE.Mesh(
+      new THREE.SphereGeometry(1.8, 32, 32),
+      new THREE.MeshStandardMaterial({
+        color:0x880000, emissive:0xff2200, emissiveIntensity:1,
+        metalness:0.5, roughness:0.4
+      })
+    );
+    sunGroup.add(sunCore);
+    sunLight.position.copy(sunCore.position);
+
+    // Sun particles & glow
+    {
+      const geo = new THREE.BufferGeometry();
+      const cnt = 8000, arr=new Float32Array(cnt*3);
+      for(let i=0;i<cnt;i++){
+        const r=2.8+Math.random()*0.3, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+        arr[3*i]   = r*Math.sin(ph)*Math.cos(th);
+        arr[3*i+1] = r*Math.sin(ph)*Math.sin(th);
+        arr[3*i+2] = r*Math.cos(ph);
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(arr,3));
+      sunGroup.add(new THREE.Points(
+        geo, new THREE.PointsMaterial({ color:0xffcc00, size:0.1, transparent:true, opacity:0.7 })
+      ));
+      sunGroup.add(new THREE.Mesh(
+        new THREE.SphereGeometry(4.2,64,64),
+        new THREE.MeshBasicMaterial({
+          color:0xffaa00, transparent:true, opacity:0.15,
+          blending:THREE.AdditiveBlending, depthWrite:false
+        })
+      ));
+    }
+
+    // Sun rays
+    const raysGroup = new THREE.Group();
+    const rayMat = new THREE.LineBasicMaterial({ color:0xffffcc, transparent:true, opacity:0.3 });
+    for(let i=0;i<180;i++){
+      const dir=new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).normalize();
+      const end = dir.multiplyScalar(10+Math.random()*4);
+      raysGroup.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), end]),
+        rayMat.clone()
+      ));
+    }
+    sunGroup.add(raysGroup);
+
+    // Label helper
+    function createLabel(n){
+      const size=128, cv=document.createElement('canvas');
+      cv.width=cv.height=size;
+      const ctx=cv.getContext('2d');
+      ctx.fillStyle='red'; ctx.font='bold 80px sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(n, size/2, size/2);
+      return new THREE.Sprite(new THREE.SpriteMaterial({
+        map:new THREE.CanvasTexture(cv), transparent:true
+      }));
+    }
+
+    // Sperms
+    const sperms=[], spermMat=new THREE.MeshBasicMaterial({ color:0x00ffff });
+    for(let i=1;i<=40;i++){
+      const g=new THREE.Group();
+      g.add(new THREE.Mesh(new THREE.SphereGeometry(0.15,8,8), spermMat));
+      const tailGeo=new THREE.BufferGeometry();
+      tailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6),3));
+      g.add(new THREE.Line(tailGeo,new THREE.LineBasicMaterial({ color:0x00ffff })));
+      const lbl=createLabel(i.toString());
+      lbl.scale.set(2,2,1); lbl.position.set(0,0.5,0);
+      g.add(lbl);
+      g.position.set((Math.random()-0.5)*80,(Math.random()-0.5)*80,(Math.random()-0.5)*80);
+      g.userData={ velocity:new THREE.Vector3((Math.random()-0.5)*0.05,(Math.random()-0.5)*0.05,(Math.random()-0.5)*0.05), tail:tailGeo, label:lbl };
+      scene.add(g); sperms.push(g);
+    }
+
+    // Atoms
+    const atoms=[], nucMat=new THREE.MeshStandardMaterial({ color:0x2196F3 }), eleMat=new THREE.MeshStandardMaterial({ color:0xffffff });
+    class Atom {
+      constructor(x,y,z,count=2){
+        this.group=new THREE.Group(); this.group.position.set(x,y,z);
+        this.group.add(new THREE.Mesh(new THREE.SphereGeometry(0.7,16,16), nucMat));
+        this.rings=[];
+        [1.2,1.5].forEach((rad,i)=>{
+          const mat=new THREE.MeshBasicMaterial({ color:0x33ccff, transparent:true, opacity:0.5, side:THREE.BackSide });
+          const ring=new THREE.Mesh(new THREE.TorusGeometry(rad,0.03,8,100), mat);
+          ring.rotation.x = Math.PI/2; ring.userData={ speed:(i+1)*0.02+0.01 };
+          this.group.add(ring); this.rings.push(ring);
+        });
+        this.electrons=[];
+        for(let i=0;i<count;i++){
+          const orbit=new THREE.Object3D();
+          orbit.userData={ angle:Math.random()*2*Math.PI, speed:0.01+Math.random()*0.01, radius:1.2+i*0.5,
+            mesh:new THREE.Mesh(new THREE.SphereGeometry(0.15,12,12), eleMat) };
+          orbit.add(orbit.userData.mesh); this.group.add(orbit); this.electrons.push(orbit);
+        }
+        scene.add(this.group);
+      }
+      update(){
+        this.rings.forEach(r=>r.rotation.y+=r.userData.speed);
+        this.electrons.forEach(e=>{
+          e.userData.angle+=e.userData.speed;
+          e.userData.mesh.position.set(
+            Math.cos(e.userData.angle)*e.userData.radius,
+            Math.sin(e.userData.angle)*e.userData.radius,
+            0
+          );
+        });
+      }
+    }
+    for(let i=0;i<25;i++){
+      const r=25+Math.random()*15, θ=Math.random()*Math.PI, φ=Math.random()*2*Math.PI;
+      atoms.push(new Atom(
+        Math.sin(θ)*Math.cos(φ)*r,
+        Math.sin(θ)*Math.sin(φ)*r,
+        Math.cos(θ)*r,
+        2+Math.floor(Math.random()*3)
+      ));
+    }
+
+    // Molecules
+    const molecules=[];
+    class MoleculeChain {
+      constructor(){
+        this.group=new THREE.Group(); this.pts=[new THREE.Vector3()];
+        const len=3+Math.floor(Math.random()*5);
+        for(let i=0;i<len;i++){
+          const dir=new THREE.Vector3(Math.random()-0.5,Math.random()-0.5,Math.random()-0.5).normalize();
+          this.pts.push(this.pts[i].clone().add(dir.multiplyScalar(1+Math.random()*1.5)));
+        }
+        const geoS=new THREE.SphereGeometry(0.2,12,12);
+        this.pts.forEach(p=>{
+          const m=new THREE.Mesh(geoS,new THREE.MeshStandardMaterial({
+            color:0x00ff00, emissive:0x003300, emissiveIntensity:0.2, metalness:0.3, roughness:0.7
+          }));
+          m.position.copy(p); this.group.add(m);
+        });
+        this.group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(this.pts),
+          new THREE.LineBasicMaterial({ color:0x00ff00, transparent:true, opacity:0.6 })
+        ));
+        this.group.position.set((Math.random()-0.5)*50,(Math.random()-0.5)*50,(Math.random()-0.5)*50);
+        this.group.userData={ rx:(Math.random()-0.5)*0.005, ry:(Math.random()-0.5)*0.005 };
+        scene.add(this.group);
+      }
+      update(){
+        this.group.rotation.x+=this.group.userData.rx;
+        this.group.rotation.y+=this.group.userData.ry;
+      }
+    }
+    for(let i=0;i<30;i++) molecules.push(new MoleculeChain());
+
+    // Molecule interactions
+    const interactions=[];
+    class MoleculeInteraction {
+      constructor(a,b){
+        this.a=a; this.b=b; this.color=new THREE.Color().setHSL(Math.random(),1,0.5); this.orig=[];
+        [a,b].forEach(m=>{
+          m.group.children.forEach(ch=>{
+            if(ch.material&&ch.material.color){
+              this.orig.push({ mesh:ch, color:ch.material.color.clone() });
+              ch.material.color.copy(this.color);
+            }
+          });
+        });
+        const pts=[a.group.position,b.group.position];
+        this.line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+          new THREE.LineBasicMaterial({ color:this.color, transparent:true, opacity:0.8, blending:THREE.AdditiveBlending })
+        );
+        scene.add(this.line);
+        this.life=0;
+      }
+      update(dt){
+        this.life+=dt;
+        this.line.material.opacity=Math.max(0.8-this.life*1.5,0);
+        if(this.life>0.6){
+          this.orig.forEach(o=>o.mesh.material.color.copy(o.color));
+          scene.remove(this.line);
+          return false;
+        }
+        return true;
+      }
+    }
+    function maybeMoleculeInteraction(){
+      if(Math.random()<0.01 && molecules.length>1){
+        const i=Math.floor(Math.random()*molecules.length),
+              j=(i+1)%molecules.length;
+        interactions.push(new MoleculeInteraction(molecules[i], molecules[j]));
+      }
+    }
+
+    // Sparkles on sperms
+    const sparkleMeshes=[], clock=new THREE.Clock();
+    function spawnSpark(pos){
+      const m=new THREE.Mesh(new THREE.SphereGeometry(0.05,6,6),
+        new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0x88ffff, emissiveIntensity:1, transparent:true, opacity:1 }));
+      m.position.copy(pos); m.userData.birth=clock.getElapsedTime();
+      scene.add(m); sparkleMeshes.push(m);
+    }
+    function updateSparkles(){
+      const now=clock.getElapsedTime();
+      for(let i=sparkleMeshes.length-1;i>=0;i--){
+        const sp=sparkleMeshes[i], age=now-sp.userData.birth;
+        if(age>2){ scene.remove(sp); sparkleMeshes.splice(i,1); }
+        else sp.material.opacity=Math.max(1-age/2,0);
+      }
+    }
+
+    // Sun beams hitting camera
+    const beams=[];
+    class SunBeam {
+      constructor(){
+        const origin=sunGroup.position.clone();
+        const targetPos=camera.position.clone();
+        const dir=new THREE.Vector3().subVectors(targetPos, origin);
+        const dist=dir.length();
+        const geo=new THREE.CylinderGeometry(5,0.5,dist,32,1,true);
+        geo.translate(0,-dist/2,0);
+        const mat=new THREE.MeshBasicMaterial({
+          color:0xffffff, transparent:true, opacity:0.5,
+          blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide
+        });
+        this.mesh=new THREE.Mesh(geo,mat);
+        this.mesh.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0,1,0), dir.clone().normalize()
+        );
+        this.mesh.position.copy(origin);
+        this.life=0;
+        scene.add(this.mesh);
+      }
+      update(dt){
+        this.life+=dt;
+        this.mesh.material.opacity=Math.max(0.5*(1-this.life/0.7),0);
+        if(this.life>0.7){ scene.remove(this.mesh); return false; }
+        return true;
+      }
+    }
+
+    // Sperms update
+    function updateSperms(){
+      sperms.forEach(s=>{
+        const dir=new THREE.Vector3().subVectors(sunGroup.position,s.position).normalize();
+        s.userData.velocity.add(dir.multiplyScalar(0.003)).multiplyScalar(0.97);
+        s.position.add(s.userData.velocity);
+        const arr=s.userData.tail.getAttribute('position');
+        const back=s.userData.velocity.clone().normalize().multiplyScalar(-1);
+        arr.setXYZ(0,0,0,0); arr.setXYZ(1,back.x,back.y,back.z); arr.needsUpdate=true;
+        spawnSpark(s.position);
+        s.userData.label.quaternion.copy(camera.quaternion);
+        if(s.position.distanceTo(sunGroup.position)<2){
+          s.position.set((Math.random()-0.5)*80,(Math.random()-0.5)*80,(Math.random()-0.5)*0.05);
+          s.userData.velocity.set((Math.random()-0.5)*0.05,(Math.random()-0.5)*0.05,(Math.random()-0.5)*0.05);
+        }
+      });
+    }
+
+    // Animate
+    let angle=0;
+    function animate(){
+      requestAnimationFrame(animate);
+      const dt=clock.getDelta(), t=clock.getElapsedTime();
+      updateHUD();
+      nebulaGroup.rotation.y+=0.0002;
+      sparkleGroup.rotation.y+=0.0001;
+
+      // Camera plus mobile tilt
+      const gNorm=THREE.MathUtils.clamp(orientGamma/90,-1,1),
+            bNorm=THREE.MathUtils.clamp((orientBeta-45)/45,-1,1);
+      const offX=Math.sin(t*0.2)*3+gNorm*10,
+            offY=Math.cos(t*0.3)*2+bNorm*10,
+            offZ=Math.sin(t*0.4)*3;
+      angle+=0.0015; const rad=60;
+      camera.position.set(Math.cos(angle)*rad+offX, Math.sin(angle/2)*rad+offY, Math.sin(angle)*rad+offZ);
+      camera.lookAt(sunGroup.position);
+
+      // Updates
+      sunGroup.rotation.y+=0.003; sunGroup.rotation.x+=0.0015; raysGroup.rotation.y+=0.002;
+      atoms.forEach(a=>a.update());
+      updateSperms();
+      updateSparkles();
+      molecules.forEach(m=>m.update());
+      maybeMoleculeInteraction();
+      interactions.forEach((int,i)=>{ if(!int.update(dt)) interactions.splice(i,1); });
+
+      // Sun beams occasionally
+      if(Math.random()<0.01) beams.push(new SunBeam());
+      for(let i=beams.length-1;i>=0;i--){
+        if(!beams[i].update(dt)) beams.splice(i,1);
+      }
+
+      controls.update();
+      renderer.render(scene,camera);
+    }
+    animate();
+  </script>
+</body>
+</html>

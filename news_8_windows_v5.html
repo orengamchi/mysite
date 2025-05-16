@@ -1,0 +1,695 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>תבנית מחולל גרפי</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:100%;height:100%;background:#000;color:#fff;font-family:Arial,sans-serif;overflow:hidden}
+    .toolbar{position:absolute;top:0;left:0;right:0;height:50px;background:#111;display:flex;align-items:center;overflow-x:auto;padding:0 10px;z-index:100}
+    .toolbar .tool{margin:0 6px;position:relative}
+    .toolbar select{background:#222;border:1px solid #444;border-radius:4px;padding:5px 8px;cursor:pointer;color:#fff;transition:background .3s}
+    .toolbar select:hover{background:#333}
+    .toolbar svg{width:22px;height:22px;fill:#fff;cursor:pointer;transition:transform .2s,opacity .2s;padding:6px;box-sizing:content-box}
+    .toolbar svg:hover{transform:scale(1.1);opacity:0.8}
+    .toolbar .tooltip{position:absolute;top:-30px;background:#333;color:#fff;padding:4px 8px;border-radius:4px;font-size:0.8rem;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity 0.2s ease,transform 0.2s ease;transform:translateY(5px);z-index:101}
+    .toolbar .tool:hover .tooltip{opacity:1;transform:translateY(0)}
+    
+    .content{position:absolute;top:50px;bottom:0;width:100%;display:flex;flex-direction:column}
+    /* חלונות ורקע */
+    .windows{display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;gap:8px;padding:8px;flex:1;position:relative;background-size:300% 300%;}
+    @media(max-width:800px){.windows{grid-template-columns:1fr;grid-template-rows:repeat(8,auto)}}
+
+    /* אנימציות מעבר */
+    @keyframes fadeAnim{0%{opacity:0;transform:scale(0.8)}100%{opacity:1;transform:scale(1)}}
+    @keyframes flashAnim{0%,20%,40%,60%,80%,100%{opacity:1}10%,30%,50%,70%,90%{opacity:0}}
+    @keyframes glitchAnim{0%{transform:translate(0)}20%{transform:translate(-5px,5px) rotate(2deg)}40%{transform:translate(5px,-5px) rotate(-2deg)}60%{transform:translate(-5px,-5px) rotate(3deg)}80%{transform:translate(5px,5px) rotate(-3deg)}100%{transform:translate(0)}}
+    @keyframes slideAnim{0%{transform:translateY(-100%) scale(0.9)}100%{transform:translateY(0) scale(1)}}
+    @keyframes fadeOut{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(0.8)}}
+    .window.fade{animation:fadeAnim .3s ease both;animation-delay:var(--delay, 0ms)}
+    .window.flash{animation:flashAnim .5s ease both;animation-delay:var(--delay, 0ms)}
+    .window.glitch{animation:glitchAnim .5s linear both;animation-delay:var(--delay, 0ms)}
+    .window.slide{animation:slideAnim .5s cubic-bezier(0.68, -0.55, 0.265, 1.55) both;animation-delay:var(--delay, 0ms)}
+    .window.fadeOut{animation:fadeOut .2s ease both;animation-delay:var(--delay, 0ms)}
+
+    /* חלון ומדיה */
+    .window{position:relative;background:rgba(0,0,0,0.6);border:1px solid #444;border-radius:6px;overflow:hidden;transition:border .3s;pointer-events:auto}
+    .window input[type=file]{display:none}
+    .window .media-wrapper{position:absolute;top:0;left:0;overflow:auto;border:1px dashed transparent;pointer-events:auto}
+    .window .media-wrapper:focus-within{border-color:#888}
+    .window img,.window video{display:block;max-width:100%;max-height:100%;object-fit:cover;pointer-events:auto}
+    .window-large{grid-row:1/span 2;grid-column:1}
+    .window-small-top{grid-row:1;grid-column:2}
+    .window-small-bottom{grid-row:2;grid-column:2}
+    .window-medium{grid-column:auto;grid-row:auto}
+    .window .placeholder{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#888;font-size:1.2rem;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:8px}
+    .window .placeholder svg{width:28px;height:28px;fill:#888}
+    .window .placeholder:hover svg{fill:#aaa}
+    .window .placeholder:hover{color:#aaa}
+
+    /* באנר וגרדיאנט */
+    .banner{height:calc(100vh / 6);padding:10px;background:linear-gradient(90deg,#0044cc,#cc0044,#00cc77);background-size:300% 300%;animation:gradBG 6s linear infinite;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:0;position:relative;z-index:1;overflow:hidden}
+    @keyframes gradBG{0%{background-position:0 50%}50%{background-position:100% 50%}100%{background-position:0 50%}}
+    .banner-text{width:calc(100% - 20px);max-width:calc(100% - 20px);padding-left:15px;transition:width 0.3s ease,max-width 0.3s ease,margin-right 0.3s ease}
+    .banner-text.bug-visible{width:calc(100% - (100vh / 6) - 30px);max-width:calc(100% - (100vh / 6) - 30px);margin-right:calc(100vh / 6 + 10px)}
+    .banner h1{font-size:4rem;font-weight:bold;margin-bottom:0;transition:color .3s,font-size .3s,font-family .3s}
+    .banner p{font-size:1.8rem;margin-top:0;transition:color .3s,font-size .3s,font-family .3s}
+    .bug-window{position:absolute;right:0;top:0;width:calc(100vh / 6);height:100%;background:rgba(0,0,0,0.6);border:1px solid #444;border-radius:0 6px 6px 0;overflow:hidden;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:2}
+    .bug-window input[type=file]{display:none}
+    .bug-window .bug-placeholder{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#888;font-size:1.2rem;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:8px}
+    .bug-window .bug-placeholder svg{width:28px;height:28px;fill:#888}
+    .bug-window .bug-placeholder:hover svg{fill:#aaa}
+    .bug-window .bug-placeholder:hover{color:#aaa}
+    .bug-window .bug-text{position:absolute;bottom:8px;width:100%;text-align:center;color:#fff;font-size:1rem;background:rgba(0,0,0,0.5);padding:4px}
+    .bug-window img,.bug-window video{display:block;width:100%;height:100%;object-fit:cover;pointer-events:auto}
+    @media (max-width:600px){
+      .bug-window{width:100px;height:100%;right:0}
+      .banner-text{width:calc(100% - 20px);max-width:calc(100% - 20px);font-size:0.8rem;margin-right:10px}
+      .banner-text.bug-visible{width:calc(100% - 120px);max-width:calc(100% - 120px);margin-right:110px}
+      .banner h1{font-size:2rem}
+      .banner p{font-size:1rem}
+      .bug-window .bug-text{font-size:0.8rem}
+    }
+
+    /* טקסט רץ */
+    .ticker{height:5vh;background:#111;overflow:hidden;position:relative;z-index:1;transition:background .3s}
+    .ticker p{position:absolute;white-space:nowrap;width:auto;animation:tick 12s linear infinite;font-size:1rem;line-height:5vh;padding-left:100%;transition:color .3s,font-size .3s,font-family .3s}
+    @keyframes tick{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
+
+    /* מודל עורך */
+    .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:200}
+    .modal{background:#222;padding:20px;border:2px solid #444;border-radius:8px;width:90%;max-width:400px;color:#fff}
+    .modal h2{margin-bottom:10px;font-size:1.2rem}
+    .modal label{display:block;margin:8px 0 4px}
+    .modal input,.modal textarea,.modal select{width:100%;padding:6px;border:1px solid #555;border-radius:4px;background:#111;color:#fff}
+    .modal textarea{height:80px;resize:none}
+    .modal button{margin-top:12px;padding:8px 12px;border:none;border-radius:4px;background:#00aa44;color:#fff;cursor:pointer;display:flex;align-items:center}
+    .modal button svg{width:18px;height:18px;margin-right:8px;fill:#fff}
+    #logo-input{display:none}
+    .logo{position:absolute;top:60px;right:10px;width:120px;max-width:100%;cursor:pointer;z-index:1}
+  </style>
+</head>
+<body>
+  <input type="file" id="logo-input" accept="image/*">
+  <div class="toolbar">
+    <div class="tool">
+      <select id="split-select" onchange="changeGrid(this.value)">
+        <option value="8">8 חלונות</option>
+        <option value="7">7 חלונות</option>
+        <option value="6">6 חלונות</option>
+        <option value="5">5 חלונות</option>
+        <option value="4">4 חלונות</option>
+        <option value="3" selected>3 חלונות</option>
+        <option value="2">2 חלונות</option>
+        <option value="1">1 חלון</option>
+      </select>
+      <span class="tooltip">בחר מספר חלונות</span>
+    </div>
+    <div class="tool">
+      <select id="transition-select">
+        <option value="fade" selected>Fade</option>
+        <option value="flash">Flash</option>
+        <option value="glitch">Glitch</option>
+        <option value="slide">Slide</option>
+      </select>
+      <span class="tooltip">בחר אנימציית מעבר</span>
+    </div>
+    <div class="tool">
+      <svg viewBox="0 0 24 24" onclick="openEditor('banner')" title="עיצוב כותרת ראשית וגרדיאנט"><path d="M12 2a10 10 0 00-10 10c0 2.5.9 4.8 2.4 6.6A10 10 0 0012 22a10 10 0 0010-10c0-2.5-.9-4.8-2.4-6.6A10 10 0 0012 2zM12 6a6 6 0 110 12A6 6 0 0112 6z"/></svg>
+      <span class="tooltip">עיצוב כותרת ראשית וגרדיאנט</span>
+    </div>
+    <div class="tool">
+      <svg viewBox="0 0 24 24" onclick="openSubEditor()" title="עיצוב תת-כותרת"><path d="M3 6h18v2H3V6zm0 5h12v2H3v-2zm0 5h18v2H3v-2z"/></svg>
+      <span class="tooltip">עיצוב תת-כותרת</span>
+    </div>
+    <div class="tool">
+      <svg viewBox="0 0 24 24" onclick="openEditor('ticker')" title="עיצוב סטרייפ"><path d="M4 4h16v4l-3-3-3 3V4H4v16h10v-4l3 3 3-3v4H4V4z"/></svg>
+      <span class="tooltip">עיצוב סטרייפ</span>
+    </div>
+    <div class="tool">
+      <svg viewBox="0 0 24 24" onclick="openEditor('windowsBg')" title="רקע חלונות"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v10H7V7z"/></svg>
+      <span class="tooltip">רקע חלונות</span>
+    </div>
+    <div class="tool">
+      <svg viewBox="0 0 24 24" onclick="openEditor('bug')" title="עיצוב חלון באג"><path d="M12 2a7 7 0 00-7 7v3h2l1 3h2l1-3h2l1 3h2l1-3h2V9a7 7 0 00-7-7zm-3 7a1 1 0 112 0 1 1 0 01-2 0zm6 0a1 1 0 112 0 1 1 0 01-2 0z"/></svg>
+      <span class="tooltip">עיצוב חלון באג</span>
+    </div>
+    <div class="tool">
+      <svg viewBox="0 0 24 24" onclick="openEditor('logo')" title="עיצוב לוגו"><path d="M4 4h16v16H4V4zm2 2v12h12V6H6zm3 3h6v6H9V9z"/></svg>
+      <span class="tooltip">עיצוב לוגו</span>
+    </div>
+  </div>
+  <div class="content">
+    <div class="windows" id="windows">
+      <div class="window window-large focused" id="win1">
+        <input type="file" id="input1" accept="image/*,video/*">
+        <div class="placeholder"><svg viewBox="0 0 24 24"><path d="M12 4v7m-4-3l4-4 4 4M7 14a5 5 0 0010 0H7z"/></svg> העלה לכאן</div>
+      </div>
+      <div class="window window-small-top" id="win2">
+        <input type="file" id="input2" accept="image/*,video/*">
+        <div class="placeholder"><svg viewBox="0 0 24 24"><path d="M12 4v7m-4-3l4-4 4 4M7 14a5 5 0 0010 0H7z"/></svg> העלה לכאן</div>
+      </div>
+      <div class="window window-small-bottom" id="win3">
+        <input type="file" id="input3" accept="image/*,video/*">
+        <div class="placeholder"><svg viewBox="0 0 24 24"><path d="M12 4v7m-4-3l4-4 4 4M7 14a5 5 0 0010 0H7z"/></svg> העלה לכאן</div>
+      </div>
+      <div class="window window-medium" id="win4">
+        <input type="file" id="input4" accept="image/*,video/*">
+        <div class="placeholder"><svg viewBox="0 0 24 24"><path d="M12 4v7m-4-3l4-4 4 4M7 14a5 5 0 0010 0H7z"/></svg> העלה לכאן</div>
+      </div>
+      <div class="window window-medium" id="win5">
+        <input type="file" id="input5" accept="image/*,video/*">
+        <div class="placeholder"><svg viewBox="0 0 24 24"><path d="M12 4v7m-4-3l4-4 4 4M7 14a5 5 0 0010 0H7z"/></svg> העלה לכאן</div>
+      </div>
+      <div class="window window-medium" id="win6">
+        <input type="file" id="input6" accept="image/*,video/*">
+        <div class="placeholder"><svg viewBox="0 0 24 24"><path d="M12 4v7m-4-3l4-4 4 4M7 14a5 5 0 0010 0H7z"/></svg> העלה לכאן</div>
+      </div>
+      <div class="window window-medium" id="win7">
+        <input type="file" id="input7" accept="image/*,video/*">
+        <div class="placeholder"><svg viewBox="0 0 24 24"><path d="M12 4v7m-4-3l4-4 4 4M7 14a5 5 0 0010 0H7z"/></svg> העלה לכאן</div>
+      </div>
+      <div class="window window-medium" id="win8">
+        <input type="file" id="input8" accept="image/*,video/*">
+        <div class="placeholder"><svg viewBox="0 0 24 24"><path d="M12 4v7m-4-3l4-4 4 4M7 14a5 5 0 0010 0H7z"/></svg> העלה לכאן</div>
+      </div>
+    </div>
+    <div class="banner" id="banner">
+      <div class="banner-text">
+        <h1 id="banner-h1">כותרת ראשית חזקה</h1>
+        <p id="banner-p">תת-כותרת בינונית</p>
+      </div>
+      <div class="bug-window" id="bug-window">
+        <input type="file" id="bug-input" accept="image/*,video/*">
+        <div class="bug-placeholder"><svg viewBox="0 0 24 24"><path d="M12 4v7m-4-3l4-4 4 4M7 14a5 5 0 0010 0H7z"/></svg> העלה לכאן</div>
+        <div class="bug-text" id="bug-text">טקסט באג</div>
+      </div>
+    </div>
+    <div class="ticker" id="ticker">
+      <p id="ticker-p">טקסט רץ דינמי • עדכונים חיים •</p>
+    </div>
+  </div>
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal" id="modal">
+      <h2 id="modal-title"></h2>
+      <div id="modal-body"></div>
+      <button onclick="applyModal()">
+        <svg viewBox="0 0 24 24"><path d="M4 4v16h16V8h-8V4H4zm12 0v4h4"/></svg>
+        שמור וסגור
+      </button>
+    </div>
+  </div>
+<script>
+  // טעינת הגדרות משמורות
+  function initSettings() {
+    const banner = document.getElementById('banner');
+    const h1 = document.getElementById('banner-h1');
+    const p = document.getElementById('banner-p');
+    const ticker = document.getElementById('ticker');
+    const tickerP = document.getElementById('ticker-p');
+    const w = document.getElementById('windows');
+    const logo = document.querySelector('.logo');
+    
+    const savedBanner = localStorage.getItem('bannerColors');
+    if (savedBanner) {
+      const { c1, c2, c3, titleColor, spd } = JSON.parse(savedBanner);
+      banner.style.background = `linear-gradient(90deg,${c1},${c2},${c3})`;
+      banner.style.animation = `gradBG ${spd}s linear infinite`;
+      h1.style.color = titleColor;
+    }
+    const savedSubtitleColor = localStorage.getItem('subtitleColor');
+    if (savedSubtitleColor) {
+      p.style.color = savedSubtitleColor;
+    }
+    const savedTicker = localStorage.getItem('tickerColors');
+    if (savedTicker) {
+      const { bg, text } = JSON.parse(savedTicker);
+      ticker.style.background = bg;
+      tickerP.style.color = text;
+    }
+    const savedBug = localStorage.getItem('bugSettings');
+    if (savedBug) {
+      const { textColor, bgColor, text, fontFamily, fontWeight, fontSize } = JSON.parse(savedBug);
+      const bugText = document.getElementById('bug-text');
+      const bugWin = document.getElementById('bug-window');
+      bugText.style.color = textColor;
+      bugWin.style.backgroundColor = bgColor;
+      bugText.textContent = text;
+      bugText.style.fontFamily = fontFamily;
+      bugText.style.fontWeight = fontWeight;
+      bugText.style.fontSize = fontSize;
+    }
+    const savedBugVisibility = localStorage.getItem('bugVisibility');
+    const bugWin = document.getElementById('bug-window');
+    bugWin.style.display = savedBugVisibility === 'hidden' ? 'none' : 'flex';
+    const savedWindowsBg = localStorage.getItem('windowsBg');
+    if (savedWindowsBg) {
+      const { type, media, c1, c2, c3, spd } = JSON.parse(savedWindowsBg);
+      if (type === 'gradient') {
+        w.style.background = `linear-gradient(90deg,${c1},${c2},${c3})`;
+        w.style.backgroundSize = '300% 300%';
+        w.style.animation = `gradBG ${spd}s linear infinite`;
+      } else if (type === 'media' && media) {
+        w.style.backgroundImage = `url(${media})`;
+        w.style.backgroundSize = 'cover';
+        w.style.backgroundPosition = 'center';
+        w.style.animation = '';
+      }
+    }
+    const savedLogoSettings = localStorage.getItem('logoSettings');
+    if (savedLogoSettings) {
+      const { width } = JSON.parse(savedLogoSettings);
+      logo.style.width = `${width}px`;
+    }
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    initSettings();
+    document.querySelectorAll('.window').forEach(w => {
+      w.addEventListener('click', () => focusWindow(w.id));
+    });
+    const bugWin = document.getElementById('bug-window');
+    const bugInp = document.getElementById('bug-input');
+    bugWin.addEventListener('click', () => bugInp.click());
+    bugInp.addEventListener('change', e => {
+      const f = e.target.files[0];
+      renderMedia(f, bugWin, bugInp, true);
+    });
+    bugWin.addEventListener('dragover', e => e.preventDefault());
+    bugWin.addEventListener('dragenter', e => e.preventDefault());
+    bugWin.addEventListener('drop', e => {
+      e.preventDefault();
+      const f = e.dataTransfer.files[0];
+      if (f && (f.type.startsWith('image/') || f.type.startsWith('video/'))) {
+        renderMedia(f, bugWin, bugInp, true);
+      }
+    });
+    updateBannerTextPosition();
+  });
+
+  // לוגו
+  const logo = document.createElement('img');
+  logo.className = 'logo';
+  logo.src = 'logo.png';
+  document.body.appendChild(logo);
+  document.getElementById('logo-input').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (f) logo.src = URL.createObjectURL(f);
+  });
+  logo.addEventListener('click', () => document.getElementById('logo-input').click());
+
+  // סגירת מודל בלחיצה מחוץ
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-overlay')) {
+      document.getElementById('modal-overlay').style.display = 'none';
+    }
+  });
+
+  // הצג/הסתר חלון באג
+  function toggleBugWindow() {
+    const bugWin = document.getElementById('bug-window');
+    const isHidden = bugWin.style.display === 'none';
+    bugWin.style.display = isHidden ? 'flex' : 'none';
+    localStorage.setItem('bugVisibility', isHidden ? 'visible' : 'hidden');
+    updateBannerTextPosition();
+    const checkbox = document.getElementById('bugVisibility');
+    if (checkbox) checkbox.checked = isHidden;
+  }
+
+  // עדכון מיקום טקסט הבאנר
+  function updateBannerTextPosition() {
+    const bugWin = document.getElementById('bug-window');
+    const bannerText = document.querySelector('.banner-text');
+    bannerText.classList.toggle('bug-visible', bugWin.style.display !== 'none');
+  }
+
+  // פונקציה לטיפול בהצגת מדיה
+  function renderMedia(file, container, input, isBug = false) {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const media = file.type.startsWith('video') ? document.createElement('video') : document.createElement('img');
+    if (media.tagName === 'VIDEO') {
+      media.controls = true;
+      media.autoplay = true;
+      media.loop = true;
+    }
+    media.src = url;
+    media.style.width = '100%';
+    media.style.height = '100%';
+    const wrapper = document.createElement('div');
+    wrapper.className = isBug ? 'bug-media-wrapper' : 'media-wrapper';
+    wrapper.tabIndex = 0;
+    wrapper.style.width = '100%';
+    wrapper.style.height = '100%';
+    wrapper.appendChild(media);
+    container.innerHTML = '';
+    container.appendChild(input);
+    container.appendChild(wrapper);
+    if (isBug) {
+      const text = document.createElement('div');
+      text.className = 'bug-text';
+      text.id = 'bug-text';
+      text.textContent = document.getElementById('bug-text')?.textContent || 'טקסט באג';
+      container.appendChild(text);
+    }
+  }
+
+  // העלאות (קבצים ו-Drag and Drop)
+  function triggerFile(i) {
+    document.getElementById('input' + i).click();
+  }
+
+  function handleDrop(e, windowId) {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const f = files[0];
+      if (f.type.startsWith('image/') || f.type.startsWith('video/')) {
+        const cont = document.getElementById(windowId);
+        const input = document.getElementById('input' + windowId.slice(-1));
+        renderMedia(f, cont, input);
+      }
+    }
+  }
+
+  [1, 2, 3, 4, 5, 6, 7, 8].forEach(i => {
+    const inp = document.getElementById('input' + i);
+    const win = document.getElementById('win' + i);
+    win.addEventListener('click', () => triggerFile(i));
+    inp.addEventListener('change', e => {
+      const f = e.target.files[0];
+      renderMedia(f, win, inp);
+    });
+    win.addEventListener('dragover', e => e.preventDefault());
+    win.addEventListener('dragenter', e => e.preventDefault());
+    win.addEventListener('drop', e => handleDrop(e, 'win' + i));
+  });
+
+  // הגדרת פוקוס חלון
+  function focusWindow(id) {
+    document.querySelectorAll('.window').forEach(w => w.classList.remove('focused'));
+    const w = document.getElementById(id);
+    if (w) w.classList.add('focused');
+  }
+
+  // אנימציית מעבר עם כוריאוגרפיה
+  function changeGrid(v) {
+    const w = document.getElementById('windows');
+    const anim = document.getElementById('transition-select').value;
+    const durations = { fade: 300, flash: 500, glitch: 500, slide: 500 };
+    const dur = durations[anim] || 300;
+    const staggerDelay = 100;
+    const exitDur = 200;
+    const windows = document.querySelectorAll('.window');
+    
+    windows.forEach((el, index) => {
+      el.style.setProperty('--delay', `${index * staggerDelay}ms`);
+      el.classList.add('fadeOut');
+    });
+
+    setTimeout(() => {
+      windows.forEach(el => el.classList.remove('fadeOut'));
+
+      w.style.display = 'grid';
+      for (let i = 1; i <= 8; i++) {
+        document.getElementById('win' + i).style.display = i <= v ? 'block' : 'none';
+      }
+      if (v === '1') {
+        w.style.gridTemplateColumns = '1fr';
+        w.style.gridTemplateRows = '1fr';
+      } else if (v === '2') {
+        w.style.gridTemplateColumns = '1fr 1fr';
+        w.style.gridTemplateRows = '1fr';
+      } else if (v === '3') {
+        w.style.gridTemplateColumns = '2fr 1fr';
+        w.style.gridTemplateRows = '1fr 1fr';
+      } else if (v === '4') {
+        w.style.gridTemplateColumns = '1fr 1fr';
+        w.style.gridTemplateRows = '1fr 1fr';
+      } else if (v === '5') {
+        w.style.gridTemplateColumns = '2fr 1fr 1fr';
+        w.style.gridTemplateRows = '1fr 1fr';
+      } else if (v === '6') {
+        w.style.gridTemplateColumns = '1fr 1fr 1fr';
+        w.style.gridTemplateRows = '1fr 1fr';
+      } else if (v === '7') {
+        w.style.gridTemplateColumns = '2fr 1fr 1fr 1fr';
+        w.style.gridTemplateRows = '1fr 1fr';
+      } else if (v === '8') {
+        w.style.gridTemplateColumns = '2fr 1fr 1fr';
+        w.style.gridTemplateRows = '1fr 1fr 1fr';
+      }
+
+      const visibleWindows = Array.from(windows).filter(el => el.style.display !== 'none');
+      visibleWindows.forEach((el, index) => {
+        el.style.setProperty('--delay', `${index * staggerDelay}ms`);
+        el.classList.add(anim);
+      });
+
+      setTimeout(() => {
+        visibleWindows.forEach(el => {
+          el.classList.remove(anim);
+          el.style.removeProperty('--delay');
+        });
+      }, dur + (visibleWindows.length - 1) * staggerDelay);
+    }, exitDur + (windows.length - 1) * staggerDelay);
+  }
+
+  // מודל עורך כללית
+  let modalMode = '';
+  function openEditor(mode) {
+    modalMode = mode;
+    const ov = document.getElementById('modal-overlay');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+    body.innerHTML = '';
+    if (mode === 'banner') {
+      const h1 = document.getElementById('banner-h1');
+      const ban = document.getElementById('banner');
+      const savedBanner = localStorage.getItem('bannerColors');
+      const currentColors = savedBanner ? JSON.parse(savedBanner) : { c1: '#0044cc', c2: '#cc0044', c3: '#00cc77', titleColor: '#ffffff', spd: '6' };
+      const currentFontSizeH1 = parseFloat(h1.style.fontSize || '200');
+      title.textContent = 'עיצוב כותרת ראשית וגרדיאנט';
+      body.innerHTML =
+        `<label>כותרת:</label><input id="banTitle" value="${h1.textContent}">` +
+        `<label>גופן כותרת:</label><select id="banFontFamily"><option value="Arial">Arial</option><option value="'Courier New'">Courier</option><option value="'Times New Roman'">Times</option><option value="'Verdana'">Verdana</option><option value="'Georgia'">Georgia</option><option value="'Palatino'">Palatino</option></select>` +
+        `<label>משקל פונט:</label><select id="banFontWeight"><option value="normal">רגיל</option><option value="bold">הדגש</option><option value="lighter">קליל</option></select>` +
+        `<label>גודל פונט (%):</label><input type="number" id="banFontSize" value="${currentFontSizeH1}">` +
+        `<label>צבע כותרת:</label><input type="color" id="banTitleColor" value="${currentColors.titleColor}">` +
+        `<label>צבע 1:</label><input type="color" id="banC1" value="${currentColors.c1}">` +
+        `<label>צבע 2:</label><input type="color" id="banC2" value="${currentColors.c2}">` +
+        `<label>צבע 3:</label><input type="color" id="banC3" value="${currentColors.c3}">` +
+        `<label>מהירות (שניות):</label><input type="number" id="banSpd" value="${currentColors.spd}">`;
+      body.querySelector('#banFontFamily').value = h1.style.fontFamily || 'Arial';
+      body.querySelector('#banFontWeight').value = h1.style.fontWeight || 'bold';
+    } else if (mode === 'ticker') {
+      const p = document.getElementById('ticker-p');
+      const ticker = document.getElementById('ticker');
+      const savedTicker = localStorage.getItem('tickerColors');
+      const tickerDefaults = savedTicker ? JSON.parse(savedTicker) : { bg: '#111111', text: '#ffffff' };
+      const currentFontSize = parseFloat(p.style.fontSize || '16');
+      const currentSpeed = p.style.animationDuration || '12s';
+      title.textContent = 'עיצוב סטרייפ';
+      body.innerHTML =
+        `<label>טקסט רץ:</label><textarea id="ticText" style="height:80px">${p.textContent}</textarea>` +
+        `<label>גופן:</label><select id="ticFontFamily"><option value="Arial">Arial</option><option value="'Courier New'">Courier</option><option value="'Times New Roman'">Times</option><option value="'Verdana'">Verdana</option><option value="'Georgia'">Georgia</option><option value="'Palatino'">Palatino</option></select>` +
+        `<label>משקל פונט:</label><select id="ticFontWeight"><option value="normal">רגיל</option><option value="bold">הדגש</option><option value="lighter">קליל</option></select>` +
+        `<label>גודל פונט (px):</label><input type="number" id="ticFontSize" value="${currentFontSize}">` +
+        `<label>צבע רקע:</label><input type="color" id="ticBg" value="${tickerDefaults.bg}">` +
+        `<label>צבע טקסט:</label><input type="color" id="ticCol" value="${tickerDefaults.text}">` +
+        `<label>מהירות (שניות):</label><input type="number" id="ticSpd" value="${parseFloat(currentSpeed)}">`;
+      body.querySelector('#ticFontFamily').value = p.style.fontFamily || 'Arial';
+      body.querySelector('#ticFontWeight').value = p.style.fontWeight || 'normal';
+    } else if (mode === 'windowsBg') {
+      title.textContent = 'רקע חלונות';
+      const savedWindowsBg = localStorage.getItem('windowsBg');
+      const defaults = savedWindowsBg && JSON.parse(savedWindowsBg).type === 'gradient' ? JSON.parse(savedWindowsBg) : { c1: '#0044cc', c2: '#cc0044', c3: '#00cc77', spd: '6' };
+      body.innerHTML =
+        `<label>העלה תמונה/וידאו:</label><input type="file" id="bgFile" accept="image/*,video/*">` +
+        `<label>או גרדיאנט:</label><input type="color" id="bgC1" value="${defaults.c1}">` +
+        `<input type="color" id="bgC2" value="${defaults.c2}">` +
+        `<input type="color" id="bgC3" value="${defaults.c3}">` +
+        `<label>מהירות (שניות):</label><input type="number" id="bgSpd" value="${defaults.spd}">`;
+    } else if (mode === 'bug') {
+      const bugText = document.getElementById('bug-text');
+      const bugWin = document.getElementById('bug-window');
+      title.textContent = 'עיצוב חלון באג';
+      body.innerHTML =
+        `<label>הצג חלון באג:</label><input type="checkbox" id="bugVisibility" ${bugWin.style.display !== 'none' ? 'checked' : ''}>` +
+        `<label>טקסט באג:</label><input id="bugText" value="${bugText.textContent}">` +
+        `<label>גופן טקסט:</label><select id="bugFontFamily"><option value="Arial">Arial</option><option value="'Courier New'">Courier</option><option value="'Times New Roman'">Times</option><option value="'Verdana'">Verdana</option><option value="'Georgia'">Georgia</option><option value="'Palatino'">Palatino</option></select>` +
+        `<label>משקל פונט:</label><select id="bugFontWeight"><option value="normal">רגיל</option><option value="bold">הדגש</option><option value="lighter">קליל</option></select>` +
+        `<label>גודל פונט (px):</label><input type="number" id="bugFontSize" value="${parseFloat(bugText.style.fontSize || '14')}">` +
+        `<label>צבע טקסט:</label><input type="color" id="bugTextColor" value="${bugText.style.color || '#ffffff'}">` +
+        `<label>צבע רקע:</label><input type="color" id="bugBgColor" value="${bugWin.style.backgroundColor || '#000000'}">` +
+        `<label>העלה מדיה:</label><input type="file" id="bugMedia" accept="image/*,video/*">`;
+      body.querySelector('#bugFontFamily').value = bugText.style.fontFamily || 'Arial';
+      body.querySelector('#bugFontWeight').value = bugText.style.fontWeight || 'normal';
+      body.querySelector('#bugVisibility').addEventListener('change', toggleBugWindow);
+    } else if (mode === 'logo') {
+      const logo = document.querySelector('.logo');
+      const currentWidth = parseInt(logo.style.width || '120');
+      title.textContent = 'עיצוב לוגו';
+      body.innerHTML =
+        `<label>העלה לוגו:</label><input type="file" id="logoModalInput" accept="image/*">` +
+        `<label>רוחב לוגו (px):</label><input type="number" id="logoWidth" value="${currentWidth}" min="50" max="500">`;
+      const logoInput = body.querySelector('#logoModalInput');
+      logoInput.addEventListener('change', e => {
+        const f = e.target.files[0];
+        if (f) logo.src = URL.createObjectURL(f);
+      });
+    }
+    ov.style.display = 'flex';
+  }
+
+  // עורך תת-כותרת
+  function openSubEditor() {
+    modalMode = 'subtitle';
+    const ov = document.getElementById('modal-overlay');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+    body.innerHTML = '';
+    const p = document.getElementById('banner-p');
+    const savedSubtitleColor = localStorage.getItem('subtitleColor') || '#ffffff';
+    const currentFontSizeP = parseFloat(p.style.fontSize || '250');
+    title.textContent = 'עיצוב תת-כותרת';
+    body.innerHTML =
+      `<label>תת-כותרת:</label><input id="banSub" value="${p.textContent}">` +
+      `<label>גופן תת-כותרת:</label><select id="subFontFamily"><option value="Arial">Arial</option><option value="'Courier New'">Courier</option><option value="'Times New Roman'">Times</option><option value="'Verdana'">Verdana</option><option value="'Georgia'">Georgia</option><option value="'Palatino'">Palatino</option></select>` +
+      `<label>משקל פונט:</label><select id="subFontWeight"><option value="normal">רגיל</option><option value="bold">הדגש</option><option value="lighter">קליל</option></select>` +
+      `<label>גודל פונט (%):</label><input type="number" id="subFontSize" value="${currentFontSizeP}">` +
+      `<label>צבע תת-כותרת:</label><input type="color" id="banSubColor" value="${savedSubtitleColor}">`;
+    body.querySelector('#subFontFamily').value = p.style.fontFamily || 'Arial';
+    body.querySelector('#subFontWeight').value = p.style.fontWeight || 'normal';
+    ov.style.display = 'flex';
+  }
+
+  function applyModal() {
+    const ov = document.getElementById('modal-overlay');
+    const w = document.getElementById('windows');
+    if (modalMode === 'banner') {
+      const h1 = document.getElementById('banner-h1');
+      h1.textContent = document.getElementById('banTitle').value;
+      h1.style.color = document.getElementById('banTitleColor').value;
+      h1.style.fontFamily = document.getElementById('banFontFamily').value;
+      h1.style.fontWeight = document.getElementById('banFontWeight').value;
+      h1.style.fontSize = document.getElementById('banFontSize').value + '%';
+      const c1 = document.getElementById('banC1').value;
+      const c2 = document.getElementById('banC2').value;
+      const c3 = document.getElementById('banC3').value;
+      const spd = document.getElementById('banSpd').value;
+      const ban = document.getElementById('banner');
+      ban.style.background = `linear-gradient(90deg,${c1},${c2},${c3})`;
+      ban.style.animation = `gradBG ${spd}s linear infinite`;
+      localStorage.setItem('bannerColors', JSON.stringify({ c1, c2, c3, titleColor: h1.style.color, spd }));
+    } else if (modalMode === 'subtitle') {
+      const p = document.getElementById('banner-p');
+      p.textContent = document.getElementById('banSub').value;
+      p.style.color = document.getElementById('banSubColor').value;
+      p.style.fontFamily = document.getElementById('subFontFamily').value;
+      p.style.fontWeight = document.getElementById('subFontWeight').value;
+      p.style.fontSize = document.getElementById('subFontSize').value + '%';
+      localStorage.setItem('subtitleColor', p.style.color);
+    } else if (modalMode === 'ticker') {
+      const p = document.getElementById('ticker-p');
+      p.textContent = document.getElementById('ticText').value;
+      document.getElementById('ticker').style.background = document.getElementById('ticBg').value;
+      p.style.color = document.getElementById('ticCol').value;
+      p.style.fontFamily = document.getElementById('ticFontFamily').value;
+      p.style.fontWeight = document.getElementById('ticFontWeight').value;
+      p.style.fontSize = document.getElementById('ticFontSize').value + 'px';
+      const spd = document.getElementById('ticSpd').value;
+      p.style.animation = `tick ${spd}s linear infinite`;
+      localStorage.setItem('tickerColors', JSON.stringify({ bg: document.getElementById('ticker').style.background, text: p.style.color }));
+    } else if (modalMode === 'windowsBg') {
+      const fi = document.getElementById('bgFile');
+      const c1 = document.getElementById('bgC1').value;
+      const c2 = document.getElementById('bgC2').value;
+      const c3 = document.getElementById('bgC3').value;
+      const spd = document.getElementById('bgSpd').value;
+      if (fi.files[0]) {
+        const url = URL.createObjectURL(fi.files[0]);
+        w.style.backgroundImage = `url(${url})`;
+        w.style.backgroundSize = 'cover';
+        w.style.backgroundPosition = 'center';
+        w.style.animation = '';
+        localStorage.setItem('windowsBg', JSON.stringify({ type: 'media', media: url, c1, c2, c3, spd }));
+      } else {
+        w.style.background = `linear-gradient(90deg,${c1},${c2},${c3})`;
+        w.style.backgroundSize = '300% 300%';
+        w.style.animation = `gradBG ${spd}s linear infinite`;
+        w.style.backgroundImage = '';
+        localStorage.setItem('windowsBg', JSON.stringify({ type: 'gradient', media: null, c1, c2, c3, spd }));
+      }
+    } else if (modalMode === 'bug') {
+      const bugText = document.getElementById('bug-text');
+      const bugWin = document.getElementById('bug-window');
+      bugText.textContent = document.getElementById('bugText').value;
+      bugText.style.fontFamily = document.getElementById('bugFontFamily').value;
+      bugText.style.fontWeight = document.getElementById('bugFontWeight').value;
+      bugText.style.fontSize = document.getElementById('bugFontSize').value + 'px';
+      bugText.style.color = document.getElementById('bugTextColor').value;
+      bugWin.style.backgroundColor = document.getElementById('bugBgColor').value;
+      const bugMedia = document.getElementById('bugMedia');
+      if (bugMedia.files[0]) {
+        renderMedia(bugMedia.files[0], bugWin, document.getElementById('bug-input'), true);
+      }
+      localStorage.setItem('bugSettings', JSON.stringify({
+        textColor: bugText.style.color,
+        bgColor: bugWin.style.backgroundColor,
+        text: bugText.textContent,
+        fontFamily: bugText.style.fontFamily,
+        fontWeight: bugText.style.fontWeight,
+        fontSize: bugText.style.fontSize
+      }));
+    } else if (modalMode === 'logo') {
+      const logo = document.querySelector('.logo');
+      const width = document.getElementById('logoWidth').value;
+      logo.style.width = `${width}px`;
+      localStorage.setItem('logoSettings', JSON.stringify({ width }));
+    }
+    ov.style.display = 'none';
+  }
+</script>
+</body>
+</html>

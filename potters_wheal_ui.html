@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Prevent zoom on mobile -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Galgal Kadariam – Interactive Potter’s Wheel with Neon Text</title>
+    <!-- ספריות Three.js ונספחים -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/FontLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/geometries/TextGeometry.js"></script>
+    <style>
+      body { margin:0; overflow:hidden; background:#000; }
+      canvas { display:block; }
+      
+      /* הגדרת הסליידרים - צמצום במעט והוספת זוהר */
+      input[type="range"] {
+        opacity: 0.5;
+        width: 70%;
+        max-width: 300px;
+        background: none;
+      }
+      /* אפקט לזוהר עבור הסליידר (Webkit) */
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        background: #00ffff;
+        border-radius: 50%;
+        box-shadow: 0 0 8px 2px #00ffff;
+        cursor: pointer;
+      }
+      input[type="range"]::-webkit-slider-runnable-track {
+        background: #222;
+      }
+      /* אפקט לזוהר עבור הסליידר (Firefox) */
+      input[type="range"]::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        background: #00ffff;
+        border-radius: 50%;
+        box-shadow: 0 0 8px 2px #00ffff;
+        cursor: pointer;
+      }
+      
+      /* Accent colors for sliders */
+      #light-intensity-slider { accent-color: white; }
+      #key-light-intensity-slider { accent-color: red; }
+      #rim-light-intensity-slider { accent-color: blue; }
+
+      /* Common UI styling */
+      #toolbar,
+      #controls,
+      #bottom-controls,
+      #vase-slider-container,
+      #light-slider-container,
+      #key-light-slider-container,
+      #rim-light-slider-container,
+      #camera-slider-container {
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      /* Top toolbar */
+      #toolbar {
+        position: absolute;
+        top: 0;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        background: rgba(0,0,0,0.8);
+        padding: 10px;
+        z-index: 10;
+        border-bottom: 2px solid cyan;
+      }
+      .tool-btn {
+        padding: 10px 20px;
+        font-size: 16px;
+        background: linear-gradient(135deg, #00ffff, #0000ff);
+        color: #fff;
+        border: 2px solid cyan;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.2s, transform 0.2s;
+        font-family: monospace;
+        text-shadow: 0 0 5px cyan;
+      }
+      .tool-btn:hover {
+        background: linear-gradient(135deg, #00ffff, #00ccff);
+        transform: scale(1.05);
+      }
+
+      /* Light sliders containers - מוסתרים כברירת מחדל, וממוקמים קצת יותר למטה */
+      #light-slider-container,
+      #key-light-slider-container,
+      #rim-light-slider-container {
+        position: absolute;
+        left: 0;
+        width: 100%;
+        display: none;
+        justify-content: center;
+        z-index: 10;
+        pointer-events: auto;
+      }
+      /* מיקום: קצת יותר למטה מהסרגל העליון */
+      #light-slider-container { top: 100px; }
+      #key-light-slider-container { top: 130px; }
+      #rim-light-slider-container { top: 160px; }
+
+      /* Camera slider */
+      #camera-slider-container {
+        position: absolute;
+        top: 50%;
+        right: 20px;
+        transform: translateY(-50%);
+        z-index: 999;
+      }
+      #camera-tilt-slider {
+        -webkit-appearance: slider-vertical;
+        writing-mode: bt-lr;
+        width: 8px;
+        height: 200px;
+        background: none;
+        border: none;
+      }
+
+      /* Spin button */
+      #controls {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        z-index: 10;
+      }
+      .btn {
+        width: 100px;
+        height: 100px;
+        background: radial-gradient(circle, #00ffff, #0000ff);
+        border: 2px solid cyan;
+        cursor: pointer;
+        border-radius: 50%;
+        font-size: 40px;
+        color: white;
+        text-align: center;
+        line-height: 100px;
+        box-shadow: 0 0 15px cyan, 0 0 30px #00ffff;
+        transition: background-color 0.1s, transform 0.1s;
+        font-family: monospace;
+      }
+      .btn:active { transform: scale(0.95); }
+
+      /* Bottom controls: WF and Lights buttons */
+      #bottom-controls {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+        display: flex;
+        gap: 10px;
+      }
+      .extra-btn {
+        width: 50px;
+        height: 50px;
+        background: radial-gradient(circle, #00ffff, #0000ff);
+        border: 2px solid cyan;
+        color: white;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 18px;
+        font-family: monospace;
+        box-shadow: 0 0 10px cyan;
+        transition: transform 0.1s;
+      }
+      .extra-btn:active { transform: scale(0.9); }
+
+      /* Vase sliders – מיקום מעט גבוה יותר */
+      #vase-slider-container {
+        position: absolute;
+        bottom: 150px;
+        left: 0;
+        width: 100%;
+        z-index: 999;
+        display: block;
+        pointer-events: auto;
+        padding: 0 10px;
+      }
+      #vase-slider-container input[type="range"] {
+        display: block;
+        width: 100%;
+        margin-bottom: 6px;
+        background: none;
+        border: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Top toolbar -->
+    <div id="toolbar">
+      <button class="tool-btn" data-shape="sphere">⚪</button>
+      <button class="tool-btn" data-shape="tube" aria-label="כד-חלקיקים">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="24" height="24">
+          <rect x="8" y="16" width="48" height="32" rx="8" ry="8" fill="none" stroke="#00ffff" stroke-width="4"></rect>
+          <circle cx="16" cy="32" r="4" fill="#00ffff"/>
+          <circle cx="48" cy="32" r="4" fill="#00ffff"/>
+        </svg>
+      </button>
+      <button class="tool-btn" data-shape="bowl">🥣</button>
+      <button class="tool-btn" data-shape="vase">🏺</button>
+      <button class="tool-btn" data-shape="amorph">💧</button>
+    </div>
+    
+    <!-- Light sliders (מוסתרים כברירת מחדל) -->
+    <div id="light-slider-container">
+      <input type="range" id="light-intensity-slider" min="0" max="3" step="0.1" value="1.0" />
+    </div>
+    <div id="key-light-slider-container">
+      <input type="range" id="key-light-intensity-slider" min="0" max="3" step="0.1" value="0.5" />
+    </div>
+    <div id="rim-light-slider-container">
+      <input type="range" id="rim-light-intensity-slider" min="0" max="3" step="0.1" value="0.3" />
+    </div>
+
+    <!-- Camera slider -->
+    <div id="camera-slider-container">
+      <input type="range" id="camera-tilt-slider" min="0" max="90" step="1" value="45" />
+    </div>
+
+    <!-- Spin button -->
+    <div id="controls">
+      <button class="btn" id="spin-btn"></button>
+    </div>
+
+    <!-- Bottom controls: WF and Lights buttons -->
+    <div id="bottom-controls">
+      <button class="extra-btn" id="wireframe-btn" title="Wireframe">🕸</button>
+      <button class="extra-btn" id="toggle-light-btn" title="Toggle Light Sliders">💡</button>
+    </div>
+
+    <!-- Vase / Jar sliders -->
+    <div id="vase-slider-container">
+      <input type="range" id="vase-base-slider" min="0.5" max="2.0" step="0.01" value="1.2" />
+      <input type="range" id="vase-mid-slider" min="1.0" max="3.0" step="0.01" value="1.8" />
+      <input type="range" id="vase-top-slider" min="0.5" max="2.0" step="0.01" value="1.0" />
+    </div>
+    
+    <!-- DecalGeometry – גרסה בסיסית להדגמה -->
+    <script>
+      THREE.DecalGeometry = function(mesh, position, orientation, size) {
+        THREE.BufferGeometry.call(this);
+        this.type = 'DecalGeometry';
+        const decalGeo = new THREE.PlaneGeometry(size.x, size.y);
+        decalGeo.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(orientation));
+        decalGeo.applyMatrix4(new THREE.Matrix4().makeTranslation(position.x, position.y, position.z));
+        this.copy(decalGeo);
+      };
+      THREE.DecalGeometry.prototype = Object.create(THREE.BufferGeometry.prototype);
+      THREE.DecalGeometry.prototype.constructor = THREE.DecalGeometry;
+    </script>
+
+    <!-- JavaScript ראשי -->
+    <script>
+      let scene, camera, renderer;
+      let wheel, clay, clayGroup, neonLine;
+      let rotationSpeed = 0;
+      let isSpinning = false, isStretching = false;
+      let spinBtnPressStartTime = 0;
+      let wireframeMode = false;
+      
+      let raycaster = new THREE.Raycaster();
+      let mouse = new THREE.Vector2();
+      let clayDeforming = false;
+      let lastMouse = new THREE.Vector2();
+      let isPinching = false;
+      let initialPinchDistance = 0;
+      let initialScale = 1;
+      
+      let lastClickTime = 0;
+      const doubleClickThreshold = 350;
+      
+      let particles = [];
+      let topMarkers = [];
+      
+      let clayRestPositions = null;
+      let clayVelocities = null;
+      
+      let spinLocked = false;
+      const lockedSpinSpeed = 0.06;
+      
+      // הגדרות לכד חלקיקים – הפחתנו את המספר והגדרנו גדלים
+      let vaseBaseOpening = 1.2, vaseMidOpening = 1.8, vaseTopOpening = 1.0;
+      let jarBaseOpening = 1.2, jarMidOpening = 1.8, jarTopOpening = 1.0;
+      
+      let overheadLight = null, keyLight = null, rimLight = null;
+      // הרצפה הוסרה – נוסיף GridHelper בהמשך
+      let cameraTiltAngle = 45;
+      const cameraRadius = Math.sqrt(11 * 11 + 17.32 * 17.32);
+      
+      const plasticityFactor = 0.5;
+      const gravity = -0.1;
+      const damping = 0.95;
+      
+      let deformationPressStartTime = 0;
+      let lastParticleSpawnTime = 0;
+      const longPressThreshold = 500; // ms
+      const particleSpawnInterval = 200; // ms
+      
+      let initialBaseLevel = Infinity;
+      
+      // הצורה הנוכחית
+      let currentShape = "sphere";
+      
+      // מתחילים עם הסליידרים של התאורה מוסתרים
+      let lightsVisible = false;
+      
+      // מינימום קנה מידה לכד חלקיקים עד שהתנגשות עם הקליי מתרחשת
+      const minJarScale = 0.5;
+      
+      // פונקציה לבדיקת התנגשות בין חלקיקי הכד לקליי
+      function collisionDetected() {
+        if (currentShape !== "tube") return false;
+        let jarGroup = clayGroup.children[0];
+        let clayPos = new THREE.Vector3();
+        clay.getWorldPosition(clayPos);
+        for (let sphere of jarGroup.children) {
+          let spherePos = new THREE.Vector3();
+          sphere.getWorldPosition(spherePos);
+          if (spherePos.distanceTo(clayPos) < 0.1) {
+            return true;
+          }
+        }
+        return false;
+      }
+      
+      // הוספת רצפת Grid תלת ממדית עד האופק
+      function addGridFloor() {
+        const gridSize = 200;
+        const gridDivisions = 40;
+        const gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x888888, 0x444444);
+        // מיקום מעט מתחת לגלגל
+        gridHelper.position.y = -0.5;
+        scene.add(gridHelper);
+      }
+      
+      function addNeonText() {
+        const loader = new THREE.FontLoader();
+        loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(font) {
+          const textGeo = new THREE.TextGeometry("claytronix", {
+            font: font,
+            size: 2,
+            height: 0.2,
+            curveSegments: 12,
+            bevelEnabled: true,
+            bevelThickness: 0.05,
+            bevelSize: 0.05,
+            bevelOffset: 0,
+            bevelSegments: 3
+          });
+          textGeo.computeBoundingBox();
+          textGeo.center();
+          const textMat = new THREE.MeshBasicMaterial({ 
+            color: 0x00ffff,
+            emissive: 0x00ffff
+          });
+          const textMesh = new THREE.Mesh(textGeo, textMat);
+          textMesh.position.set(0, 3.5, -10);
+          scene.add(textMesh);
+        });
+      }
+      
+      function init(){
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+        
+        camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
+        camera.position.set(0,11,17.32);
+        
+        renderer = new THREE.WebGLRenderer({antialias:true});
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+        
+        new THREE.RGBELoader()
+          .setDataType(THREE.UnsignedByteType)
+          .load("https://threejs.org/examples/textures/equirectangular/royal_esplanade_4k.hdr", (texture)=>{
+            texture.mapping = THREE.EquirectangularReflectionMapping;
+            scene.environment = texture;
+            scene.background = texture;
+            setTimeout(() => {
+              if(wheel && wheel.material){
+                wheel.material.envMap = texture;
+                wheel.material.envMapIntensity = 1.0;
+                wheel.material.needsUpdate = true;
+              }
+            }, 100);
+          });
+        
+        overheadLight = new THREE.DirectionalLight(0xffffff,1);
+        overheadLight.position.set(0,20,10);
+        overheadLight.castShadow = true;
+        overheadLight.shadow.camera.left = -10;
+        overheadLight.shadow.camera.right = 10;
+        overheadLight.shadow.camera.top = 10;
+        overheadLight.shadow.camera.bottom = -10;
+        overheadLight.shadow.camera.near = 0.5;
+        overheadLight.shadow.camera.far = 50;
+        scene.add(overheadLight);
+        
+        keyLight = new THREE.DirectionalLight(0xff0000,0.5);
+        keyLight.position.set(1,5,15);
+        keyLight.castShadow = true;
+        scene.add(keyLight);
+        
+        rimLight = new THREE.DirectionalLight(0x0000ff,0.3);
+        rimLight.position.set(-1,5,10);
+        rimLight.castShadow = true;
+        scene.add(rimLight);
+        
+        let coneGeom = new THREE.ConeGeometry(5,20,32,1,true);
+        let coneMat = new THREE.MeshBasicMaterial({
+          color: 0xffffaa,
+          opacity: 0.2,
+          transparent:true,
+          blending: THREE.AdditiveBlending,
+          depthWrite:false
+        });
+        let lightBeam = new THREE.Mesh(coneGeom, coneMat);
+        lightBeam.rotation.x = Math.PI;
+        lightBeam.position.set(0,20,0);
+        scene.add(lightBeam);
+        
+        let wheelGeo = new THREE.CylinderGeometry(4,4,0.5,32);
+        let wheelMat = new THREE.MeshStandardMaterial({
+          color: 0x2222ff,
+          metalness: 1.0,
+          roughness: 0.1,
+          emissive: 0x000033,
+          emissiveIntensity: 0.5
+        });
+        wheel = new THREE.Mesh(wheelGeo, wheelMat);
+        wheel.castShadow = true;
+        wheel.receiveShadow = true;
+        scene.add(wheel);
+        
+        const neonMat = new THREE.LineBasicMaterial({color:0x00ffff});
+        const neonGeo = new THREE.BufferGeometry();
+        neonGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array([0,0,0,1,0,0]),3));
+        neonLine = new THREE.Line(neonGeo, neonMat);
+        wheel.add(neonLine);
+        
+        // הוספת רצפת Grid תלת ממדית עד האופק
+        addGridFloor();
+        
+        addGlowingMarkers();
+        addTopMarkers();
+        
+        let topHemi = new THREE.SphereGeometry(2,64,32,0,Math.PI*2,0,Math.PI/2);
+        let clayMat = new THREE.MeshPhysicalMaterial({
+          color: 0xaa7744,
+          metalness: 0.2,
+          roughness: 0.3,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.25,
+          emissive: 0x220022,
+          emissiveIntensity: 0.3
+        });
+        let clayMesh = new THREE.Mesh(topHemi, clayMat);
+        clayMesh.castShadow = true;
+        clayMesh.receiveShadow = true;
+        clayMesh.geometry.translate(0,2,0);
+        
+        let posAttr = clayMesh.geometry.attributes.position;
+        clayRestPositions = new Float32Array(posAttr.array);
+        clayVelocities = new Float32Array(posAttr.count*3);
+        
+        initialBaseLevel = Infinity;
+        for(let i = 1; i < clayRestPositions.length; i += 3){
+          if(clayRestPositions[i] < initialBaseLevel){
+            initialBaseLevel = clayRestPositions[i];
+          }
+        }
+        
+        clayGroup = new THREE.Group();
+        clayGroup.add(clayMesh);
+        wheel.add(clayGroup);
+        clay = clayMesh;
+        
+        addNeonText();
+        
+        setupEvents();
+        setupToolbar();
+        setupExtraControls();
+        setupLightSliders();
+        setupVaseSliders();
+        setupCameraSlider();
+        setupToggleLightBtn();
+        
+        animate();
+      }
+      
+      function addGlowingMarkers(){
+        let markerCount = 8;
+        let markerGeom = new THREE.SphereGeometry(0.2,16,16);
+        let matMagenta = new THREE.MeshBasicMaterial({ color: 0xff00ff, emissive: 0xff00ff, emissiveIntensity: 2 });
+        for(let i = 0; i < markerCount; i++){
+          let marker = new THREE.Mesh(markerGeom, matMagenta);
+          let angle = (i / markerCount) * Math.PI * 2;
+          marker.position.set(Math.cos(angle) * 4, 0, Math.sin(angle) * 4);
+          wheel.add(marker);
+        }
+        let matCyan = new THREE.MeshBasicMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 2 });
+        for(let i = 0; i < markerCount; i++){
+          let marker = new THREE.Mesh(markerGeom, matCyan);
+          let angle = ((i + 0.5) / markerCount) * Math.PI * 2;
+          marker.position.set(Math.cos(angle) * 4, 0, Math.sin(angle) * 4);
+          wheel.add(marker);
+        }
+      }
+      
+      function addTopMarkers(){
+        let markerCount = 5;
+        for(let i = 0; i < markerCount; i++){
+          let innerRadius = 1 + Math.random() * 2;
+          let outerRadius = innerRadius + 0.1 + Math.random() * 0.5;
+          let thetaLength = 0.5 + Math.random();
+          let thetaStart = Math.random() * Math.PI * 2;
+          let ringGeo = new THREE.RingGeometry(innerRadius, outerRadius, 32, 1, thetaStart, thetaLength);
+          let ringMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            emissive: 0xffffff,
+            emissiveIntensity: 2,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.0
+          });
+          let ring = new THREE.Mesh(ringGeo, ringMat);
+          ring.position.y = 0.26;
+          ring.rotation.x = -Math.PI/2;
+          topMarkers.push(ring);
+          wheel.add(ring);
+        }
+      }
+      
+      function setupCameraSlider(){
+        let tiltSlider = document.getElementById("camera-tilt-slider");
+        tiltSlider.addEventListener("input", () => {
+          cameraTiltAngle = parseFloat(tiltSlider.value);
+        });
+      }
+      
+      function setupLightSliders(){
+        let overheadContainer = document.getElementById("light-slider-container");
+        overheadContainer.addEventListener("mousedown", e => e.stopPropagation());
+        overheadContainer.addEventListener("touchstart", e => e.stopPropagation());
+        overheadContainer.addEventListener("pointerdown", e => e.stopPropagation());
+        let overheadSlider = document.getElementById("light-intensity-slider");
+        overheadSlider.addEventListener("input", () => {
+          if (overheadLight) overheadLight.intensity = parseFloat(overheadSlider.value);
+        });
+        
+        let keyContainer = document.getElementById("key-light-slider-container");
+        keyContainer.addEventListener("mousedown", e => e.stopPropagation());
+        keyContainer.addEventListener("touchstart", e => e.stopPropagation());
+        keyContainer.addEventListener("pointerdown", e => e.stopPropagation());
+        let keySlider = document.getElementById("key-light-intensity-slider");
+        keySlider.addEventListener("input", () => {
+          if (keyLight) keyLight.intensity = parseFloat(keySlider.value);
+        });
+        
+        let rimContainer = document.getElementById("rim-light-slider-container");
+        rimContainer.addEventListener("mousedown", e => e.stopPropagation());
+        rimContainer.addEventListener("touchstart", e => e.stopPropagation());
+        rimContainer.addEventListener("pointerdown", e => e.stopPropagation());
+        let rimSlider = document.getElementById("rim-light-intensity-slider");
+        rimSlider.addEventListener("input", () => {
+          if (rimLight) rimLight.intensity = parseFloat(rimSlider.value);
+        });
+      }
+      
+      function setupToolbar(){
+        let toolbar = document.getElementById("toolbar");
+        let toolBtns = toolbar.querySelectorAll(".tool-btn");
+        toolBtns.forEach(btn => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            let shape = btn.getAttribute("data-shape");
+            setClayShape(shape);
+          });
+        });
+      }
+      
+      function setClayShape(shape){
+        currentShape = shape;
+        let vaseUI = document.getElementById("vase-slider-container");
+        if (shape === "vase" || shape === "tube"){
+          vaseUI.style.display = "block";
+        } else {
+          vaseUI.style.display = "none";
+        }
+        
+        if (shape === "sphere"){
+          let geo = new THREE.SphereGeometry(2, 64, 32);
+          geo.translate(0, 2, 0);
+          let mat = new THREE.MeshPhysicalMaterial({
+            color: 0xaa7744,
+            metalness: 0.2,
+            roughness: 0.3,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.25,
+            emissive: 0x220022,
+            emissiveIntensity: 0.3
+          });
+          setClayGroup(new THREE.Mesh(geo, mat));
+        } else if (shape === "tube"){
+          buildJarWithParticles();
+        } else if (shape === "bowl"){
+          let bowlProfile = [
+            new THREE.Vector2(2.5, 0),
+            new THREE.Vector2(2.4, -0.3),
+            new THREE.Vector2(2.0, -0.8),
+            new THREE.Vector2(1.5, -1.2),
+            new THREE.Vector2(1.0, -1.4),
+            new THREE.Vector2(0.5, -1.5),
+            new THREE.Vector2(0.0, -1.5)
+          ];
+          let geo = new THREE.LatheGeometry(bowlProfile, 64);
+          geo.translate(0, 2, 0);
+          let mat = new THREE.MeshPhysicalMaterial({
+            color: 0x333333,
+            metalness: 0.0,
+            roughness: 0.05,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.05,
+            side: THREE.DoubleSide,
+            emissive: 0x002244,
+            emissiveIntensity: 0.7
+          });
+          setClayGroup(new THREE.Mesh(geo, mat));
+        } else if (shape === "vase"){
+          buildVase();
+        } else if (shape === "amorph"){
+          let geo = new THREE.SphereGeometry(2, 32, 32);
+          let pos = geo.attributes.position;
+          for (let i = 0; i < pos.count; i++){
+            let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+            let factor = 0.3 * (Math.random() - 0.5);
+            x += x * factor; y += y * factor; z += z * factor;
+            pos.setXYZ(i, x, y, z);
+          }
+          pos.needsUpdate = true;
+          geo.translate(0, 2, 0);
+          let mat = new THREE.MeshPhysicalMaterial({
+            color: 0x8855aa,
+            metalness: 0.2,
+            roughness: 0.4,
+            clearcoat: 0.8,
+            clearcoatRoughness: 0.2,
+            side: THREE.DoubleSide,
+            emissive: 0x221144,
+            emissiveIntensity: 0.4
+          });
+          setClayGroup(new THREE.Mesh(geo, mat));
+        }
+      }
+      
+      // בניית כד חלקיקים – הפחתנו את כמות החלקיקים ושינינו את הגודל לנקודות זוהרות (0.02)
+      function buildJarWithParticles(){
+        let jarGroup = new THREE.Group();
+        let avgSize = (jarBaseOpening + jarMidOpening + jarTopOpening) / 3;
+        let particleBaseCount = 1500;
+        let desiredCount = Math.floor(particleBaseCount / avgSize);
+        if (avgSize <= 0.5) {
+          desiredCount = Math.floor(desiredCount / 2);
+        } else if (avgSize >= 2.5) {
+          desiredCount = Math.floor(desiredCount * 1.2);
+        }
+        desiredCount = Math.max(200, Math.min(desiredCount, 6000));
+        for (let i = 0; i < desiredCount; i++){
+          let randY = THREE.MathUtils.lerp(-1.5, 1.5, Math.random());
+          let t = (randY + 1.5) / 3;
+          let radius;
+          if (t < 0.5){
+            let ratio = t / 0.5;
+            radius = jarBaseOpening + (jarMidOpening - jarBaseOpening) * ratio;
+          } else {
+            let ratio = (t - 0.5) / 0.5;
+            radius = jarMidOpening + (jarTopOpening - jarMidOpening) * ratio;
+          }
+          let angle = Math.random() * Math.PI * 2;
+          let revolveSpeed = 0.2 + Math.random() * 0.3;
+          // הגאומטריה של החלקיק כנקודה זוהרת – גודל 0.02
+          let sphereGeom = new THREE.SphereGeometry(0.02, 8, 8);
+          let hue = Math.random() * 360;
+          let color = new THREE.Color(`hsl(${hue},100%,50%)`);
+          let sphereMat = new THREE.MeshStandardMaterial({
+            color: color,
+            emissive: color,
+            emissiveIntensity: 1.0,
+            roughness: 0.2,
+            metalness: 0.0
+          });
+          let sphere = new THREE.Mesh(sphereGeom, sphereMat);
+          sphere.userData.radius = radius;
+          sphere.userData.angle = angle;
+          sphere.userData.revSpeed = revolveSpeed;
+          sphere.userData.baseY = randY + 2;
+          sphere.userData.amp = 0.02;
+          sphere.userData.phaseX = Math.random() * Math.PI * 2;
+          sphere.userData.phaseY = Math.random() * Math.PI * 2;
+          sphere.userData.phaseZ = Math.random() * Math.PI * 2;
+          sphere.userData.freqX = 4 + Math.random() * 4;
+          sphere.userData.freqY = 4 + Math.random() * 4;
+          sphere.userData.freqZ = 4 + Math.random() * 4;
+          jarGroup.add(sphere);
+        }
+        setClayGroup(jarGroup);
+      }
+      
+      function buildVase(){
+        let baseBottom = new THREE.Vector2(vaseBaseOpening, -1.5);
+        let baseMid = new THREE.Vector2(1.2, -0.5);
+        let midPoint = new THREE.Vector2(vaseMidOpening, 1.0);
+        let topPoint = new THREE.Vector2(vaseTopOpening, 1.2);
+        let vaseProfile = [baseBottom, baseMid, midPoint, topPoint];
+        let vaseGeo = new THREE.LatheGeometry(vaseProfile, 64);
+        vaseGeo.translate(0, 2, 0);
+        let capGeom = new THREE.CircleGeometry(vaseBaseOpening, 64);
+        capGeom.rotateX(-Math.PI/2);
+        let capMat = new THREE.MeshPhysicalMaterial({
+          color: 0xffcc99,
+          metalness: 0.1,
+          roughness: 0.2,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.1,
+          side: THREE.DoubleSide,
+          emissive: 0x442200,
+          emissiveIntensity: 0.6
+        });
+        let capMesh = new THREE.Mesh(capGeom, capMat);
+        capMesh.position.y = 0.5;
+        let vaseMat = new THREE.MeshPhysicalMaterial({
+          color: 0xffcc99,
+          metalness: 0.1,
+          roughness: 0.2,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.1,
+          side: THREE.DoubleSide,
+          emissive: 0x442200,
+          emissiveIntensity: 0.6
+        });
+        let vaseMesh = new THREE.Mesh(vaseGeo, vaseMat);
+        let group = new THREE.Group();
+        group.add(vaseMesh);
+        group.add(capMesh);
+        setClayGroup(group);
+      }
+      
+      function setClayGroup(newClay){
+        while (clayGroup && clayGroup.children.length > 0){
+          clayGroup.remove(clayGroup.children[0]);
+        }
+        if (newClay.isGroup){
+          let meshChild = newClay.children.find(c => c.isMesh && c.geometry);
+          if (!meshChild){
+            clay = newClay;
+          } else {
+            clay = meshChild;
+          }
+          if (!clayGroup) clayGroup = new THREE.Group();
+          clayGroup.add(newClay);
+        } else {
+          clay = newClay;
+          if (!clayGroup) clayGroup = new THREE.Group();
+          clayGroup.add(clay);
+        }
+        
+        if (clay && clay.geometry && clay.geometry.attributes?.position){
+          let posAttr = clay.geometry.attributes.position;
+          clayRestPositions = new Float32Array(posAttr.array);
+          clayVelocities = new Float32Array(posAttr.count * 3);
+          initialBaseLevel = Infinity;
+          for (let i = 1; i < clayRestPositions.length; i += 3){
+            if (clayRestPositions[i] < initialBaseLevel){
+              initialBaseLevel = clayRestPositions[i];
+            }
+          }
+        }
+      }
+      
+      function setupVaseSliders(){
+        let container = document.getElementById("vase-slider-container");
+        container.addEventListener("mousedown", e => e.stopPropagation());
+        container.addEventListener("touchstart", e => e.stopPropagation());
+        container.addEventListener("pointerdown", e => e.stopPropagation());
+        
+        let baseSlider = document.getElementById("vase-base-slider");
+        let midSlider = document.getElementById("vase-mid-slider");
+        let topSlider = document.getElementById("vase-top-slider");
+        
+        baseSlider.addEventListener("input", () => {
+          if (currentShape === "vase"){
+            vaseBaseOpening = parseFloat(baseSlider.value);
+            buildVase();
+          }
+          else if (currentShape === "tube"){
+            jarBaseOpening = parseFloat(baseSlider.value);
+            buildJarWithParticles();
+          }
+        });
+        midSlider.addEventListener("input", () => {
+          if (currentShape === "vase"){
+            vaseMidOpening = parseFloat(midSlider.value);
+            buildVase();
+          }
+          else if (currentShape === "tube"){
+            jarMidOpening = parseFloat(midSlider.value);
+            buildJarWithParticles();
+          }
+        });
+        topSlider.addEventListener("input", () => {
+          if (currentShape === "vase"){
+            vaseTopOpening = parseFloat(topSlider.value);
+            buildVase();
+          }
+          else if (currentShape === "tube"){
+            jarTopOpening = parseFloat(topSlider.value);
+            buildJarWithParticles();
+          }
+        });
+      }
+      
+      function setupExtraControls(){
+        let wfBtn = document.getElementById("wireframe-btn");
+        wfBtn.addEventListener("click", toggleWireframe);
+      }
+      
+      function setupToggleLightBtn(){
+        let btn = document.getElementById("toggle-light-btn");
+        btn.addEventListener("click", () => {
+          lightsVisible = !lightsVisible;
+          document.getElementById("light-slider-container").style.display = lightsVisible ? "flex" : "none";
+          document.getElementById("key-light-slider-container").style.display = lightsVisible ? "flex" : "none";
+          document.getElementById("rim-light-slider-container").style.display = lightsVisible ? "flex" : "none";
+        });
+      }
+      
+      function toggleWireframe(){
+        wireframeMode = !wireframeMode;
+        wheel.traverse(child => {
+          if (child.isMesh && child.material && ('wireframe' in child.material)){
+            child.material.wireframe = wireframeMode;
+          }
+        });
+      }
+      
+      function setupEvents(){
+        let spinBtn = document.getElementById("spin-btn");
+        let lastSpinClickTime = 0;
+        
+        spinBtn.addEventListener("mousedown", () => {
+          let now = Date.now();
+          let isDouble = (now - lastSpinClickTime < doubleClickThreshold);
+          lastSpinClickTime = now;
+          if (isDouble) {
+            spinLocked = !spinLocked;
+            if (spinLocked) {
+              rotationSpeed = lockedSpinSpeed;
+              isSpinning = false;
+            }
+          } else {
+            isSpinning = true;
+            spinBtnPressStartTime = Date.now();
+          }
+        });
+        spinBtn.addEventListener("mouseup", () => {
+          if (!spinLocked) {
+            isSpinning = false;
+            spinBtn.style.backgroundColor = 'rgba(255,255,255,0.3)';
+          }
+        });
+        
+        spinBtn.addEventListener("touchstart", () => {
+          let now = Date.now();
+          let isDouble = (now - lastSpinClickTime < doubleClickThreshold);
+          lastSpinClickTime = now;
+          if (isDouble) {
+            spinLocked = !spinLocked;
+            if (spinLocked) {
+              rotationSpeed = lockedSpinSpeed;
+              isSpinning = false;
+            }
+          } else {
+            isSpinning = true;
+            spinBtnPressStartTime = Date.now();
+          }
+        });
+        spinBtn.addEventListener("touchend", () => {
+          if (!spinLocked) {
+            isSpinning = false;
+            spinBtn.style.backgroundColor = 'rgba(255,255,255,0.3)';
+          }
+        });
+        
+        window.addEventListener("keydown", (ev) => {
+          if (ev.code === "Space") {
+            isSpinning = true;
+          }
+        });
+        window.addEventListener("keyup", (ev) => {
+          if (ev.code === "Space") {
+            isSpinning = false;
+          }
+        });
+        
+        document.addEventListener("mousedown", (ev) => {
+          if (ev.button === 2) isStretching = true;
+        });
+        document.addEventListener("mouseup", () => {
+          isStretching = false;
+        });
+        document.addEventListener("touchstart", (ev) => {
+          if (ev.touches.length > 1) isStretching = true;
+        });
+        document.addEventListener("touchend", () => {
+          isStretching = false;
+        });
+        window.addEventListener("contextmenu", (ev) => ev.preventDefault());
+        
+        window.addEventListener("resize", onWindowResize);
+        
+        renderer.domElement.addEventListener("mousedown", onCanvasMouseDown, false);
+        renderer.domElement.addEventListener("mousemove", onCanvasMouseMove, false);
+        renderer.domElement.addEventListener("mouseup", onCanvasMouseUp, false);
+        
+        renderer.domElement.addEventListener("touchstart", onCanvasTouchStart, false);
+        renderer.domElement.addEventListener("touchmove", onCanvasTouchMove, false);
+        renderer.domElement.addEventListener("touchend", onCanvasTouchEnd, false);
+      }
+      
+      function onCanvasMouseDown(event){
+        if (event.target !== renderer.domElement) return;
+        if (event.button === 0) {
+          let now = Date.now();
+          if (now - lastClickTime < doubleClickThreshold) {
+            let adjustedIndent = 0.5 * (1 + Math.abs(rotationSpeed) * 10);
+            indentClay(adjustedIndent);
+            addParticlesAtClick(event.clientX, event.clientY);
+          }
+          lastClickTime = now;
+        }
+        if (event.button !== 0) return;
+        updateMouse(event.clientX, event.clientY);
+        raycaster.setFromCamera(mouse, camera);
+        let intersects = raycaster.intersectObject(clay, true);
+        if (intersects.length > 0) {
+          clayDeforming = true;
+          deformationPressStartTime = Date.now();
+          lastMouse.copy(mouse);
+          addParticlesAtClick(event.clientX, event.clientY);
+        }
+      }
+      
+      function onCanvasMouseMove(event){
+        if (event.target !== renderer.domElement) return;
+        if (!clayDeforming) return;
+        updateMouse(event.clientX, event.clientY);
+        let pressDuration = Date.now() - deformationPressStartTime;
+        let multiplier = (pressDuration > longPressThreshold) ? 2 : 1;
+        let baseIndent = 0.5 * (1 + Math.abs(rotationSpeed) * 10);
+        let adjustedIndent = baseIndent * multiplier;
+        raycaster.setFromCamera(mouse, camera);
+        let inter = raycaster.intersectObject(clay, true);
+        if (inter.length > 0) {
+          let pt = inter[0].point;
+          if (pt.y > 3.8) {
+            adjustedIndent *= 1.5;
+          }
+        }
+        indentClay(adjustedIndent);
+        lastMouse.x = THREE.MathUtils.lerp(lastMouse.x, mouse.x, 0.1);
+        lastMouse.y = THREE.MathUtils.lerp(lastMouse.y, mouse.y, 0.1);
+      }
+      
+      function onCanvasMouseUp(event){
+        if (event.target !== renderer.domElement) return;
+        clayDeforming = false;
+        deformationPressStartTime = 0;
+      }
+      
+      function onCanvasTouchStart(event){
+        if (event.target !== renderer.domElement) return;
+        if (event.touches.length === 1) {
+          let now = Date.now();
+          if (now - lastClickTime < doubleClickThreshold) {
+            let adjustedIndent = 0.5 * (1 + Math.abs(rotationSpeed) * 10);
+            indentClay(adjustedIndent);
+            addParticlesAtClick(event.touches[0].clientX, event.touches[0].clientY);
+          }
+          lastClickTime = now;
+          updateMouse(event.touches[0].clientX, event.touches[0].clientY);
+          raycaster.setFromCamera(mouse, camera);
+          let intersects = raycaster.intersectObject(clay, true);
+          if (intersects.length > 0) {
+            clayDeforming = true;
+            deformationPressStartTime = Date.now();
+            lastMouse.copy(mouse);
+            addParticlesAtClick(event.touches[0].clientX, event.touches[0].clientY);
+          }
+        } else if (event.touches.length === 2) {
+          isPinching = true;
+          initialPinchDistance = getTouchDistance(event.touches);
+          initialScale = clay.scale.x;
+        }
+      }
+      
+      function onCanvasTouchMove(event){
+        if (event.target !== renderer.domElement) return;
+        if (isPinching && event.touches.length === 2) {
+          let currentDist = getTouchDistance(event.touches);
+          let scaleRatio = currentDist / initialPinchDistance;
+          let newScale = initialScale * scaleRatio;
+          if (currentShape === "tube" && !collisionDetected()) {
+            newScale = Math.max(newScale, minJarScale);
+          }
+          newScale = Math.min(newScale, 2.2);
+          clay.scale.x = newScale;
+          clay.scale.y = newScale;
+          clay.scale.z = newScale;
+        } else if (clayDeforming && event.touches.length === 1) {
+          let touch = event.touches[0];
+          updateMouse(touch.clientX, touch.clientY);
+          let pressDuration = Date.now() - deformationPressStartTime;
+          let multiplier = (pressDuration > longPressThreshold) ? 2 : 1;
+          let baseIndent = 0.5 * (1 + Math.abs(rotationSpeed) * 10);
+          let adjustedIndent = baseIndent * multiplier;
+          raycaster.setFromCamera(mouse, camera);
+          let inter = raycaster.intersectObject(clay, true);
+          if (inter.length > 0) {
+            let pt = inter[0].point;
+            if (pt.y > 3.8) {
+              adjustedIndent *= 1.5;
+            }
+          }
+          indentClay(adjustedIndent);
+          lastMouse.x = THREE.MathUtils.lerp(lastMouse.x, mouse.x, 0.1);
+          lastMouse.y = THREE.MathUtils.lerp(lastMouse.y, mouse.y, 0.1);
+        }
+      }
+      
+      function onCanvasTouchEnd(event){
+        if (event.target !== renderer.domElement) return;
+        if (event.touches.length < 2) {
+          isPinching = false;
+          clayDeforming = false;
+          deformationPressStartTime = 0;
+        }
+      }
+      
+      function getTouchDistance(touches){
+        let dx = touches[0].clientX - touches[1].clientX;
+        let dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+      
+      function updateMouse(clientX, clientY){
+        let rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      }
+      
+      function updateClayPhysics(dt){
+        if (!clay || !clay.geometry || !clay.geometry.attributes?.position) return;
+        let positions = clay.geometry.attributes.position.array;
+        const count = positions.length;
+        for (let i = 0; i < count; i += 3) {
+          let vx = clayVelocities[i];
+          let vy = clayVelocities[i + 1];
+          let vz = clayVelocities[i + 2];
+          
+          vy += gravity * dt;
+          
+          vx *= damping; vy *= damping; vz *= damping;
+          
+          positions[i] += vx * dt;
+          positions[i + 1] += vy * dt;
+          positions[i + 2] += vz * dt;
+          
+          clayVelocities[i] = vx;
+          clayVelocities[i + 1] = vy;
+          clayVelocities[i + 2] = vz;
+          
+          clayRestPositions[i] = THREE.MathUtils.lerp(clayRestPositions[i], positions[i], dt * plasticityFactor);
+          clayRestPositions[i + 1] = THREE.MathUtils.lerp(clayRestPositions[i + 1], positions[i + 1], dt * plasticityFactor);
+          clayRestPositions[i + 2] = THREE.MathUtils.lerp(clayRestPositions[i + 2], positions[i + 2], dt * plasticityFactor);
+          
+          if (clayRestPositions[i + 1] <= initialBaseLevel + 0.2) {
+            positions[i + 1] = initialBaseLevel;
+            clayVelocities[i + 1] = 0;
+            clayRestPositions[i + 1] = initialBaseLevel;
+          }
+        }
+        clay.geometry.attributes.position.needsUpdate = true;
+        clay.geometry.computeVertexNormals();
+      }
+      
+      function indentClay(indentAmount){
+        raycaster.setFromCamera(mouse, camera);
+        let intersects = raycaster.intersectObject(clay, true);
+        if (intersects.length === 0) return;
+        let pt = intersects[0].point.clone();
+        clay.worldToLocal(pt);
+        
+        if (!clay || !clay.geometry || !clay.geometry.attributes?.position) return;
+        let positions = clay.geometry.attributes.position.array;
+        const count = positions.length;
+        const influenceRadius = 0.5;
+        for (let i = 0; i < count; i += 3) {
+          if (clayRestPositions[i + 1] <= initialBaseLevel + 0.2) continue;
+          let vx = positions[i], vy = positions[i + 1], vz = positions[i + 2];
+          let dx = vx - pt.x, dy = positions[i + 1] - pt.y, dz = vz - pt.z;
+          let dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (dist < influenceRadius) {
+            let falloff = Math.pow(1 - (dist / influenceRadius), 2);
+            positions[i] += (pt.x - vx) * indentAmount * falloff;
+            positions[i + 1] += (pt.y - vy) * indentAmount * falloff;
+            positions[i + 2] += (pt.z - vz) * indentAmount * falloff;
+            clayVelocities[i] += (pt.x - vx) * indentAmount * falloff;
+            clayVelocities[i + 1] += (pt.y - vy) * indentAmount * falloff;
+            clayVelocities[i + 2] += (pt.z - vz) * indentAmount * falloff;
+          }
+        }
+        clay.geometry.attributes.position.needsUpdate = true;
+      }
+      
+      function addParticlesAtClick(clientX, clientY){
+        updateMouse(clientX, clientY);
+        raycaster.setFromCamera(mouse, camera);
+        let intersects = raycaster.intersectObject(clay, true);
+        if (intersects.length === 0) return;
+        let contactPoint = intersects[0].point.clone();
+        for (let i = 0; i < 5; i++){
+          // קוטר 0.02 ליצירת נקודה זוהרת
+          let pGeo = new THREE.SphereGeometry(0.02, 8, 8);
+          let pMat = new THREE.MeshBasicMaterial({ 
+            color: 0xffffff, 
+            transparent: true, 
+            opacity: 1.0, 
+            blending: THREE.AdditiveBlending 
+          });
+          let particle = new THREE.Mesh(pGeo, pMat);
+          particle.position.copy(contactPoint);
+          particle.userData.velocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.2,
+            Math.random() * 0.2 + 0.1,
+            (Math.random() - 0.5) * 0.2
+          );
+          particle.userData.birthTime = performance.now();
+          scene.add(particle);
+          particles.push(particle);
+        }
+      }
+      
+      function addDecal(){
+        if (!clay) return;
+        let decalPos = new THREE.Vector3();
+        clay.getWorldPosition(decalPos);
+        decalPos.x += (Math.random() - 0.5) * 0.5;
+        decalPos.y += (Math.random() - 0.5) * 0.5;
+        decalPos.z += (Math.random() - 0.5) * 0.5;
+        
+        let decalOrientation = new THREE.Euler(
+          Math.random() * Math.PI,
+          Math.random() * Math.PI,
+          Math.random() * Math.PI
+        );
+        let decalSize = new THREE.Vector3(0.5, 0.5, 0.5);
+        let decalGeometry = new THREE.DecalGeometry(clay, decalPos, decalOrientation, decalSize);
+        let decalMaterial = new THREE.MeshBasicMaterial({
+          map: new THREE.TextureLoader().load("https://threejs.org/examples/textures/decal/decal-diffuse.png"),
+          transparent: true,
+          depthTest: true,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -4
+        });
+        let decalMesh = new THREE.Mesh(decalGeometry, decalMaterial);
+        scene.add(decalMesh);
+      }
+      
+      function animate(){
+        requestAnimationFrame(animate);
+        const dt = 0.016;
+        
+        if (clayDeforming && (Date.now() - deformationPressStartTime > longPressThreshold)) {
+          if (Date.now() - lastParticleSpawnTime > particleSpawnInterval) {
+            addParticlesAtClick(
+              window.innerWidth * ((lastMouse.x + 1) / 2),
+              window.innerHeight * (1 - ((lastMouse.y + 1) / 2))
+            );
+            lastParticleSpawnTime = Date.now();
+          }
+        }
+        
+        camera.position.x = 0;
+        camera.position.y = cameraRadius * Math.cos(THREE.MathUtils.degToRad(cameraTiltAngle));
+        camera.position.z = cameraRadius * Math.sin(THREE.MathUtils.degToRad(cameraTiltAngle));
+        camera.lookAt(0, 0, 0);
+        
+        if (spinLocked) {
+          rotationSpeed = lockedSpinSpeed;
+        } else {
+          if (isSpinning) rotationSpeed += 0.005;
+          else rotationSpeed *= 0.98;
+        }
+        wheel.rotation.y += rotationSpeed;
+        
+        if (isStretching) {
+          clay.scale.y = Math.min(clay.scale.y + 0.05, 2.0);
+          clay.scale.x = Math.max(clay.scale.x - 0.02, 0.5);
+          clay.scale.z = Math.max(clay.scale.z - 0.02, 0.5);
+        }
+        
+        let nPos = neonLine.geometry.attributes.position.array;
+        nPos[3] = 10 * Math.abs(rotationSpeed);
+        neonLine.geometry.attributes.position.needsUpdate = true;
+        
+        let spinBtn = document.getElementById("spin-btn");
+        if (isSpinning && !spinLocked) {
+          let pressDuration = Date.now() - spinBtnPressStartTime;
+          let hue = (pressDuration / 10) % 360;
+          spinBtn.style.backgroundColor = `hsl(${hue},100%,50%)`;
+        } else {
+          spinBtn.style.backgroundColor = 'rgba(255,255,255,0.3)';
+        }
+        
+        let speedFactor = Math.min(Math.abs(rotationSpeed) * 50, 1);
+        let wheelHue = (1 - speedFactor) * 0.66;
+        wheel.material.color.setHSL(wheelHue, 1, 0.5);
+        
+        let time = Date.now() * 0.005;
+        topMarkers.forEach((marker, idx) => {
+          let offset = idx * 0.5;
+          marker.material.opacity = 0.5 + 0.5 * Math.sin(time + offset);
+        });
+        
+        let now = performance.now();
+        for (let i = particles.length - 1; i >= 0; i--){
+          let p = particles[i];
+          let dtParticle = (now - p.userData.birthTime) / 1000;
+          p.position.add(p.userData.velocity);
+          p.userData.velocity.y -= 0.005;
+          if (dtParticle > 1) {
+            scene.remove(p);
+            particles.splice(i, 1);
+          }
+        }
+        
+        // עדכון עבור צורת "כד חלקיקים"
+        if (currentShape === "tube" && clayGroup.children.length > 0) {
+          let jarGroup = clayGroup.children[0];
+          if (jarGroup.isGroup) {
+            jarGroup.children.forEach(sphere => {
+              if (!sphere.userData.radius) return;
+              if (Math.abs(rotationSpeed) <= 0.06) {
+                sphere.userData.angle += sphere.userData.revSpeed * dt;
+                let r = sphere.userData.radius;
+                let tSec = now * 0.001;
+                let vibrX = sphere.userData.amp * Math.sin(sphere.userData.freqX * tSec + sphere.userData.phaseX);
+                let vibrZ = sphere.userData.amp * Math.sin(sphere.userData.freqZ * tSec + sphere.userData.phaseZ);
+                sphere.position.x = r * Math.cos(sphere.userData.angle) + vibrX;
+                sphere.position.z = r * Math.sin(sphere.userData.angle) + vibrZ;
+                let vibrY = sphere.userData.amp * Math.sin(sphere.userData.freqY * tSec + sphere.userData.phaseY);
+                sphere.position.y = sphere.userData.baseY + vibrY;
+              } else {
+                sphere.position.x += (Math.random() - 0.5) * 0.2;
+                sphere.position.y += (Math.random() - 0.5) * 0.2;
+                sphere.position.z += (Math.random() - 0.5) * 0.2;
+                if (Math.random() < 0.1) {
+                  let geoType = Math.floor(Math.random() * 3);
+                  let newGeo;
+                  let size = 0.02;
+                  if (geoType === 0) {
+                    newGeo = new THREE.SphereGeometry(size, 8, 8);
+                  } else if (geoType === 1) {
+                    newGeo = new THREE.BoxGeometry(size, size, size);
+                  } else {
+                    newGeo = new THREE.ConeGeometry(size, size * 2, 8);
+                  }
+                  sphere.geometry.dispose();
+                  sphere.geometry = newGeo;
+                }
+                let scale = 0.5 + Math.random();
+                sphere.scale.set(scale, scale, scale);
+              }
+            });
+          }
+        }
+        
+        updateClayPhysics(dt);
+        renderer.render(scene, camera);
+      }
+      
+      function onWindowResize(){
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+      
+      init();
+      
+      // טיפול בהגדלת האובייקט (pinch)
+      renderer.domElement.addEventListener("touchmove", function(event){
+        if(isPinching && event.touches.length === 2){
+          let currentDist = getTouchDistance(event.touches);
+          let scaleRatio = currentDist / initialPinchDistance;
+          let newScale = initialScale * scaleRatio;
+          if (currentShape === "tube" && !collisionDetected()){
+            newScale = Math.max(newScale, minJarScale);
+          }
+          newScale = Math.min(newScale, 2.2);
+          clay.scale.x = newScale;
+          clay.scale.y = newScale;
+          clay.scale.z = newScale;
+        }
+      }, false);
+      
+    </script>
+  </body>
+</html>
