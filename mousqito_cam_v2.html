@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>FishTrack – Mobile Optimized</title>
+    <style>
+        /* סגנונות בסיסיים לאיפוס וכיסוי מסך מלא */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100vh; /* גובה מסך מלא */
+            overflow: hidden; /* מונע גלילה */
+            background: #000; /* רקע שחור */
+            touch-action: none; /* מונע תנועות מגע ברירת מחדל */
+            user-select: none; /* מונע בחירת טקסט */
+        }
+
+        /* וידאו וקנבס מכסים את כל המסך */
+        video, canvas {
+            position: fixed; /* מיקום קבוע */
+            top: 0; left: 0; /* פינה שמאלית עליונה */
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* מכסה את האלמנט תוך שמירה על יחס גובה-רוחב */
+        }
+
+        /* סדר שכבות */
+        video {
+            z-index: 1;
+        }
+
+        canvas#overlay {
+            z-index: 2;
+        }
+
+        /* הסתרת סמן העכבר במכשירי מגע */
+        @media (hover: none) {
+            canvas#overlay {
+                cursor: none;
+            }
+        }
+
+        /* סגנון תיבת הודעה פשוט במקום alert */
+        #messageBox {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 10;
+            display: none; /* מוסתר כברירת מחדל */
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <div id="messageBox"></div>
+
+    <script>
+        /* הגדרות */
+        const REGION = 7; // גודל אזור לזיהוי תנועה (פיקסלים)
+        const THR = 20; // סף הבדל לזיהוי תנועה
+        const FRAME_MS = 120; // מרווח מינימלי בין סריקות (מילישניות)
+
+        const TRACK_LIFE = 2000; // זמן חיים של נקודת מעקב (מילישניות)
+        const PARTS = 16; // מספר חלקיקים שנוצרים מכל נקודת מעקב
+        const PART_R = 2; // רדיוס חלקיק
+        const PARTICLE_LIFE = 2000; // זמן חיים של חלקיק (מילישניות)
+
+        /* אלמנטים מה-DOM */
+        const video = document.getElementById('video');
+        const overlay = document.getElementById('overlay');
+        const ctx = overlay.getContext('2d'); // הקשר לציור על שכבת העל
+        const off = document.createElement('canvas'); // קנבס מחוץ למסך לסריקת תנועה
+        const ofctx = off.getContext('2d'); // הקשר לציור על הקנבס המחוץ למסך
+        const messageBox = document.getElementById('messageBox'); // תיבת הודעה
+
+        /* מצב האפליקציה */
+        let prev = null; // נתוני פיקסלים מהפריים הקודם
+        let last = performance.now(); // זמן הפריים האחרון בלולאה הראשית
+        let lastScan = 0; // זמן הסריקה האחרונה
+
+        const tracks = []; // מערך של נקודות מעקב
+        const particles = []; // מערך של חלקיקים
+
+        let center = { x: 0, y: 0 }; // מרכז המסך
+        let tapT = 0; // זמן הקשה אחרונה
+        let tapX = 0, tapY = 0; // מיקום הקשה אחרונה
+        let drag = null; // חלקיק נגרר
+        let dx = 0, dy = 0; // היסט גרירה
+
+        let fsRequested = false; // האם בקשת מסך מלא נשלחה
+
+        /* פונקציה להצגת הודעה למשתמש */
+        function showMessage(message) {
+            messageBox.textContent = message;
+            messageBox.style.display = 'block';
+            // הסתר הודעה לאחר מספר שניות (אופציונלי)
+            // setTimeout(() => {
+            //     messageBox.style.display = 'none';
+            // }, 5000);
+        }
+
+        /* אתחול מצלמה - מופעל אוטומטית בטעינת הדף */
+        async function initCamera() {
+            try {
+                // בקשת גישה למצלמה האחורית (environment)
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream; // הצגת זרם המצלמה באלמנט הוידאו
+                // כאשר מטא-נתונים של הוידאו נטענים, התחל ניגון ושנה גודל הקנבס
+                video.onloadedmetadata = () => {
+                    video.play();
+                    resize();
+                    // התחל את לולאת האנימציה רק לאחר שהוידאו מוכן
+                    requestAnimationFrame(loop);
+                };
+            } catch (e) {
+                // טיפול בשגיאות גישה למצלמה
+                console.error('Error accessing camera:', e);
+                showMessage('שגיאה בגישה למצלמה: ' + e.name);
+            }
+        }
+
+        /* שינוי גודל הקנבס בהתאם לגודל הוידאו או החלון */
+        function resize() {
+            // התאם את גודל שכבת העל לגודל הוידאו או לגודל החלון אם הוידאו עדיין לא מוכן
+            overlay.width = video.videoWidth || innerWidth;
+            overlay.height = video.videoHeight || innerHeight;
+            // הקנבס המחוץ למסך קטן יותר לביצועים טובים יותר
+            off.width = overlay.width / 4;
+            off.height = overlay.height / 4;
+            // עדכון מרכז המסך
+            center = { x: overlay.width / 2, y: overlay.height / 2 };
+        }
+
+        // האזנה לאירוע שינוי גודל חלון
+        window.addEventListener('resize', resize);
+
+        // הפעלת אתחול המצלמה בעת טעינת הדף
+        window.addEventListener('load', initCamera);
+
+
+        /* העברת אירועי מצביע (מגע/עכבר) מאלמנט הוידאו לשכבת העל */
+        ['pointerdown', 'pointermove', 'pointerup'].forEach(evt => {
+            video.addEventListener(evt, e => {
+                // בקשת מסך מלא בתנועת המשתמש הראשונה (לשיפור חווית מובייל)
+                if (!fsRequested) {
+                    document.documentElement.requestFullscreen().catch(() => { }); // התעלם משגיאות אם לא אפשרי
+                    fsRequested = true;
+                }
+                // יצירת אירוע עכבר מקביל והעברתו לשכבת העל
+                const type = evt === 'pointerdown' ? 'mousedown' : evt === 'pointermove' ? 'mousemove' : 'mouseup';
+                overlay.dispatchEvent(new MouseEvent(type, {
+                    clientX: e.clientX, clientY: e.clientY, bubbles: true, cancelable: true
+                }));
+            });
+        });
+
+        /* אינטראקציית עכבר/מגע על שכבת העל */
+        overlay.addEventListener('mousedown', e => {
+            const { x, y } = toCanvas(e); // המרת קואורדינטות למערכת הקנבס
+            const now = performance.now();
+            // זיהוי הקשה כפולה מהירה לקיבוע חלקיק
+            if (now - tapT < 300 && Math.hypot(x - tapX, y - tapY) < 20) {
+                freezeParticle(x, y);
+                tapT = 0; // איפוס זמן ההקשה
+            } else {
+                // שמירת פרטי הקשה ראשונה
+                tapT = now;
+                tapX = x;
+                tapY = y;
+                // בדיקה אם המשתמש לחץ על חלקיק קיים שניתן לגרור
+                drag = particles.find(p => p.persistent && Math.hypot(p.x - x, p.y - y) < 15);
+                if (drag) {
+                    dx = x - drag.x; // שמירת היסט הגרירה
+                    dy = y - drag.y;
+                }
+            }
+        });
+
+        overlay.addEventListener('mousemove', e => {
+            // אם יש חלקיק נגרר, עדכן את מיקומו
+            if (drag) {
+                const { x, y } = toCanvas(e);
+                drag.x = x - dx;
+                drag.y = y - dy;
+            }
+        });
+
+        // איפוס מצב גרירה בעת שחרור כפתור העכבר או יציאה משכבת העל
+        ['mouseup', 'mouseleave'].forEach(ev => overlay.addEventListener(ev, () => { drag = null; }));
+
+        /* המרת קואורדינטות אירוע לקואורדינטות הקנבס */
+        function toCanvas(e) {
+            const rect = overlay.getBoundingClientRect(); // קבלת גבולות הקנבס
+            return {
+                x: (e.clientX - rect.left) * (overlay.width / rect.width), // המרה לפי יחס הגודל
+                y: (e.clientY - rect.top) * (overlay.height / rect.height)
+            };
+        }
+
+        /* קיבוע חלקיק קרוב לנקודת הלחיצה */
+        function freezeParticle(x, y) {
+            for (const p of particles) {
+                // מצא חלקיק קרוב
+                if (Math.hypot(p.x - x, p.y - y) < 15) {
+                    p.persistent = true; // קבע את החלקיק
+                    p.vx = p.vy = 0; // אפס מהירות
+                    return; // מצאנו וקיבענו, צא מהפונקציה
+                }
+            }
+        }
+
+        /* לולאה ראשית של האנימציה והלוגיקה */
+        function loop(t) {
+            // ודא שהוידאו מוכן לפני עיבוד
+            if (video.readyState >= 2) {
+                // בצע סריקת תנועה במרווחים קבועים
+                if (t - lastScan > FRAME_MS) {
+                    scan();
+                    lastScan = t;
+                }
+                // חישוב זמן שעבר מאז הפריים האחרון (מותאם ל-60fps)
+                const dt = (t - last) / 16.67;
+                last = t;
+                // עדכון מיקומי חלקיקים
+                updateParticles(dt);
+                // ציור על הקנבס
+                draw();
+                // ניקוי נקודות מעקב וחלקיקים ישנים
+                clean();
+            }
+            // בקש את הפריים הבא בלולאה
+            requestAnimationFrame(loop);
+        }
+
+        /* זיהוי תנועה */
+        function scan() {
+            // צייר את הפריים הנוכחי מהוידאו על הקנבס המחוץ למסך (בגודל מוקטן)
+            ofctx.drawImage(video, 0, 0, off.width, off.height);
+            // קבל את נתוני הפיקסלים מהקנבס המוקטן
+            const data = ofctx.getImageData(0, 0, off.width, off.height).data;
+
+            // בצע השוואה רק אם יש נתוני פיקסלים מהפריים הקודם
+            if (prev) {
+                const hits = []; // מערך לנקודות שזוהתה בהן תנועה
+                // מעבר על אזורים בקנבס המוקטן
+                for (let y = 0; y < off.height; y += REGION) {
+                    for (let x = 0; x < off.width; x += REGION) {
+                        let diff = 0; // סכום ההבדלים בין פיקסלים
+                        let count = 0; // מספר הפיקסלים שנסרקו באזור
+                        // מעבר על פיקסלים בתוך האזור (בדילוגים)
+                        for (let dy = 0; dy < REGION; dy += 3) {
+                            for (let dx = 0; dx < REGION; dx += 3) {
+                                const i = ((y + dy) * off.width + x + dx) * 4; // אינדקס הפיקסל במערך הנתונים (RGBA)
+                                // חישוב ההבדל המוחלט בין ערכי הצבע (RGB) של הפיקסל הנוכחי והקודם
+                                diff += Math.abs(data[i] - prev[i]) +
+                                        Math.abs(data[i + 1] - prev[i + 1]) +
+                                        Math.abs(data[i + 2] - prev[i + 2]);
+                                count++;
+                            }
+                        }
+                        // אם ההבדל הממוצע באזור עולה על הסף (THR), זוהתה תנועה
+                        if (diff / count > THR) {
+                            // המרת קואורדינטות האזור לגודל הקנבס המקורי
+                            const rx = (x + REGION / 2) * (overlay.width / off.width);
+                            const ry = (y + REGION / 2) * (overlay.height / off.height);
+                            // הוספת נקודת מעקב חדשה
+                            tracks.push({ x: rx, y: ry, birth: Date.now() });
+                            // יצירת חלקיקים בנקודת התנועה
+                            spawnParticles(rx, ry, Date.now());
+                        }
+                    }
+                }
+            }
+            // שמירת נתוני הפיקסלים הנוכחיים עבור הסריקה הבאה
+            prev = data.slice(0);
+        }
+
+        /* יצירת חלקיקים בנקודה מסוימת */
+        function spawnParticles(x, y, birth) {
+            for (let i = 0; i < PARTS; i++) {
+                const ang = Math.random() * Math.PI * 2; // זווית אקראית
+                const spd = 1 + Math.random() * 1.1; // מהירות אקראית
+                particles.push({
+                    x, y, // מיקום התחלתי
+                    vx: Math.cos(ang) * spd, // רכיב מהירות X
+                    vy: Math.sin(ang) * spd, // רכיב מהירות Y
+                    birth, // זמן יצירת החלקיק
+                    life: PARTICLE_LIFE, // זמן חיים מקסימלי
+                    persistent: false // האם החלקיק מקובע
+                });
+            }
+        }
+
+        /* עדכון מיקומי חלקיקים */
+        function updateParticles(dt) {
+            const now = Date.now();
+            particles.forEach(p => {
+                // עדכן רק חלקיקים שאינם מקובעים
+                if (!p.persistent) {
+                    p.x += p.vx * dt; // עדכון מיקום X
+                    p.y += p.vy * dt; // עדכון מיקום Y
+                    p.vy += 0.02 * dt; // הוספת "כוח משיכה" קטן (מאיץ כלפי מטה)
+                    // החזרת חלקיקים לגבולות המסך והיפוך מהירות (עם איבוד אנרגיה)
+                    if (p.x < PART_R || p.x > overlay.width - PART_R) p.vx *= -0.9;
+                    if (p.y < PART_R || p.y > overlay.height - PART_R) p.vy *= -0.9;
+                    // מניעת יציאה מוחלטת מהמסך
+                    p.x = Math.max(PART_R, Math.min(overlay.width - PART_R, p.x));
+                    p.y = Math.max(PART_R, Math.min(overlay.height - PART_R, p.y));
+                    // עדכון זמן החיים שנותר
+                    p.life = PARTICLE_LIFE - (now - p.birth);
+                }
+            });
+            // הסרת חלקיקים שזמן החיים שלהם הסתיים ושאינם מקובעים
+            for (let i = particles.length - 1; i >= 0; i--) {
+                if (!particles[i].persistent && particles[i].life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        /* פונקציה למעבר הדרגתי בין צבעים (Linear Interpolation) */
+        function lerp(r1, g1, b1, r2, g2, b2, t) {
+            // t הוא ערך בין 0 ל-1 המייצג את מיקום המעבר בין הצבע הראשון לשני
+            return 'rgb(' +
+                (r1 + (r2 - r1) * t | 0) + ',' + // חישוב רכיב אדום
+                (g1 + (g2 - g1) * t | 0) + ',' + // חישוב רכיב ירוק
+                (b1 + (b2 - b1) * t | 0) + ')'; // חישוב רכיב כחול
+        }
+
+        /* ציור על הקנבס */
+        function draw() {
+            ctx.clearRect(0, 0, overlay.width, overlay.height); // ניקוי הקנבס
+            const now = Date.now();
+
+            // ציור נקודות מעקב
+            tracks.forEach(tr => {
+                const age = now - tr.birth; // גיל נקודת המעקב
+                const t = Math.min(age / TRACK_LIFE, 1); // ערך t למעבר צבע (0 עד 1)
+                // צבע משתנה מאדום לציאן בהתאם לגיל
+                const color = lerp(255, 0, 40, 0, 234, 255, t); // red->cyan
+                ctx.strokeStyle = color; // צבע קו מתאר
+                ctx.lineWidth = 2; // עובי קו מתאר
+                ctx.beginPath(); // התחלת ציור צורה
+                ctx.arc(tr.x, tr.y, 14, 0, Math.PI * 2); // ציור מעגל
+                ctx.stroke(); // ציור קו מתאר
+            });
+
+            // ציור חלקיקים
+            particles.forEach(p => {
+                const t = Math.min((Date.now() - p.birth) / PARTICLE_LIFE, 1); // ערך t למעבר צבע
+                // צבע משתנה מאדום לציאן בהתאם לגיל החלקיק
+                ctx.fillStyle = lerp(255, 0, 40, 0, 234, 255, t); // red->cyan
+                ctx.beginPath(); // התחלת ציור צורה
+                ctx.arc(p.x, p.y, PART_R, 0, Math.PI * 2); // ציור מעגל (חלקיק)
+                ctx.fill(); // מילוי הצורה בצבע
+            });
+        }
+
+        /* ניקוי נקודות מעקב וחלקיקים ישנים */
+        function clean() {
+            const now = Date.now();
+            // הסרת נקודות מעקב שזמן החיים שלהן הסתיים
+            for (let i = tracks.length - 1; i >= 0; i--) {
+                if (now - tracks[i].birth > TRACK_LIFE) tracks.splice(i, 1);
+            }
+            // חלקיקים שאינם מקובעים מוסרים בלולאת updateParticles
+        }
+
+    </script>
+</body>
+</html>
