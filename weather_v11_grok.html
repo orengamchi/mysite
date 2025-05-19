@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>תחזית עונות השנה</title>
+  <style>
+    :root {
+      --card-top: #4fc3f7;
+      --card-bot: #1565c0;
+    }
+    
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    body {
+      background: linear-gradient(to bottom right, #3a7bd5, #00d2ff);
+      background-size: 200% 200%;
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      position: relative;
+      overflow-x: hidden;
+      animation: gradientShift 10s ease infinite;
+      touch-action: manipulation;
+    }
+    
+    @keyframes gradientShift {
+      0% { background-position: 0% 0%; }
+      50% { background-position: 100% 100%; }
+      100% { background-position: 0% 0%; }
+    }
+    
+    #bg-particles {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 0;
+      filter: blur(0.5px) brightness(1.11);
+      opacity: 0.82;
+      mix-blend-mode: lighten;
+    }
+    
+    .slider-panel-right {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      flex-direction: column;
+      z-index: 99;
+      background: rgba(0,0,0,0.2);
+      padding: clamp(6px, 2vw, 8px) clamp(8px, 3vw, 12px);
+      border-radius: 20px;
+      gap: 8px;
+      width: clamp(120px, 20vw, 160px);
+      transition: opacity 0.3s ease;
+    }
+    
+    .season-slider {
+      position: fixed;
+      bottom: 35px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 99;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: clamp(200px, 90vw, 400px);
+      padding: 10px 15px;
+      background: transparent;
+      border-radius: 25px;
+      transition: opacity 0.3s ease;
+    }
+    
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .slider-label {
+      color: #fff;
+      font-size: clamp(12px, 3vw, 14px);
+      font-weight: bold;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      white-space: nowrap;
+    }
+    
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: rgba(255,255,255,0.3);
+      border-radius: 5px;
+      outline: none;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #00d2ff;
+      cursor: pointer;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 4px rgba(0,210,255,0.5);
+    }
+    
+    .season-slider label {
+      color: white;
+      font-size: clamp(14px, 4vw, 16px);
+      font-weight: bold;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      flex: 1;
+      text-align: center;
+    }
+    
+    .header-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 55px;
+      width: 100%;
+      z-index: 5;
+      padding: 0 15px;
+    }
+    
+    .free-title {
+      font-size: clamp(4rem, 12vw, 5rem);
+      font-weight: bold;
+      color: #fff;
+      text-align: center;
+      max-width: 90vw;
+      margin: 0 auto;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.7);
+      direction: rtl;
+      border: none;
+      background: none;
+      outline: none;
+    }
+    
+    .datetime {
+      color: #fff;
+      font-size: clamp(1.5rem, 4.5vw, 1.65rem);
+      margin-top: -10px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      direction: rtl;
+    }
+    
+    .subtitle {
+      font-size: clamp(2.7rem, 9vw, 3.15rem);
+      color: #e6f6ff;
+      margin: 10px 0 20px;
+      text-shadow: 0 2px 6px rgba(0,86,136,0.7);
+      direction: rtl;
+      text-align: center;
+    }
+    
+    .weather-groups-wrapper {
+      width: 100%;
+      max-width: 1200px;
+      min-height: 300px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+      padding: 0 15px;
+      margin-top: 40px;
+    }
+    
+    .weather-container {
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+      width: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    
+    .weather-card {
+      flex: 1;
+      min-width: 0;
+      max-width: 145px;
+      min-height: 345.6px;
+      background: linear-gradient(180deg, var(--card-top) 60%, var(--card-bot) 100%);
+      border-radius: 15px;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.2), 
+                  0 0 20px rgba(255,255,255,0.3);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      transform: scaleY(0);
+      transform-origin: bottom;
+      transition: transform 0.5s ease, opacity 0.5s ease;
+      overflow: hidden;
+      padding: 15px 0;
+      position: relative;
+    }
+    
+    .weather-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.2) 0%,
+        rgba(255,255,255,0) 50%,
+        rgba(255,255,255,0.2) 100%
+      );
+      opacity: 0;
+      pointer-events: none;
+      border-radius: 15px;
+      animation: reflect 1.5s ease-in-out infinite;
+      animation-delay: 3.5s;
+    }
+    
+    .weather-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 100%;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(
+        to left,
+        transparent,
+        rgba(255,255,255,0.6),
+        transparent
+      );
+      transform: skewX(-25deg);
+      opacity: 0;
+      pointer-events: none;
+      animation: swish 1.5s ease-in-out infinite;
+      animation-delay: 3.5s;
+    }
+    
+    .weather-card:nth-child(1)::before,
+    .weather-card:nth-child(1)::after { animation-delay: 3.5s; }
+    .weather-card:nth-child(2)::before,
+    .weather-card:nth-child(2)::after { animation-delay: 3.8s; }
+    .weather-card:nth-child(3)::before,
+    .weather-card:nth-child(3)::after { animation-delay: 4.1s; }
+    .weather-card:nth-child(4)::before,
+    .weather-card:nth-child(4)::after { animation-delay: 4.4s; }
+    .weather-card:nth-child(5)::before,
+    .weather-card:nth-child(5)::after { animation-delay: 4.7s; }
+    .weather-card:nth-child(6)::before,
+    .weather-card:nth-child(6)::after { animation-delay: 5.0s; }
+    .weather-card:nth-child(7)::before,
+    .weather-card:nth-child(7)::after { animation-delay: 5.3s; }
+    .weather-card:nth-child(8)::before,
+    .weather-card:nth-child(8)::after { animation-delay: 5.6s; }
+    
+    @keyframes reflect {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 0.5; }
+    }
+    
+    @keyframes swish {
+      0% { left: 100%; opacity: 0; }
+      50% { left: -100%; opacity: 1; }
+      100% { left: -100%; opacity: 0; }
+    }
+    
+    .weather-card.grow {
+      transform: scaleY(1);
+    }
+    
+    .weather-card.exit {
+      transform: scaleY(0);
+      opacity: 0;
+      transition: transform 0.5s ease, opacity 0.5s ease;
+    }
+    
+    .city {
+      font-size: clamp(1.8rem, 5vw, 2.2rem);
+      font-weight: bold;
+      color: #fff;
+      margin: 20px 0 15px;
+      text-align: center;
+      padding: 0 10px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .weather-icon {
+      font-size: clamp(2.3rem, 6vw, 2.8rem);
+      margin: 10px 0;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+      height: 60px;
+      display: flex;
+      align-items: center;
+    }
+    
+    .temp-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-bottom: 15px;
+    }
+    
+    .temp-high {
+      font-size: clamp(3.2rem, 10vw, 3.6rem);
+      font-weight: bold;
+      color: #fff;
+      margin: 5px 0;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      height: 40px;
+      display: flex;
+      align-items: center;
+    }
+    
+    .temp-low {
+      font-size: clamp(1.8rem, 6vw, 2.2rem);
+      color: #e6f6ff;
+      display: flex;
+      align-items: center;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      height: 30px;
+    }
+    
+    .moon-icon {
+      font-size: clamp(0.8rem, 2vw, 1rem);
+      margin-right: 5px;
+    }
+    
+    .disclaimer {
+      position: fixed;
+      bottom: 5px;
+      left: 0;
+      right: 0;
+      color: #fff;
+      font-size: clamp(1.6rem, 4vw, 1.8rem);
+      text-align: center;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      padding: 5px;
+      z-index: 10;
+    }
+    
+    @media (max-width: 768px) {
+      .free-title { font-size: clamp(3.6rem, 10vw, 4rem); }
+      .datetime { font-size: clamp(1.35rem, 3.375vw, 1.485rem); }
+      .subtitle { font-size: clamp(2.43rem, 6.75vw, 2.835rem); }
+      .disclaimer { font-size: clamp(1.44rem, 3.6vw, 1.62rem); }
+      .weather-groups-wrapper { max-width: 600px; }
+      .weather-card { 
+        min-height: 288px;
+        min-width: 80px;
+        max-width: 90px;
+      }
+      .city { font-size: clamp(1.6rem, 4vw, 1.8rem); margin: 15px 0 10px; height: 35px; }
+      .weather-icon { font-size: clamp(2rem, 5vw, 2.5rem); height: 50px; }
+      .temp-high { font-size: clamp(2.8rem, 8vw, 3.2rem); height: 35px; }
+      .temp-low { font-size: clamp(1.4rem, 4vw, 1.8rem); height: 25px; }
+    }
+    
+    @media (max-width: 480px) {
+      .slider-panel-right {
+        padding: clamp(4px, 1.5vw, 6px) clamp(6px, 2vw, 8px);
+        border-radius: 15px;
+        width: clamp(100px, 25vw, 120px);
+      }
+      .slider-label { font-size: clamp(10px, 2.5vw, 12px); }
+      input[type="range"] { width: 100%; }
+      .weather-groups-wrapper { max-width: 400px; }
+      .weather-card { 
+        min-height: 259.2px;
+        border-radius: 12px;
+        gap: 5px;
+        max-width: 60px;
+      }
+      .free-title { font-size: clamp(2.8rem, 7vw, 3.2rem); }
+      .datetime { font-size: clamp(1.05rem, 2.625vw, 1.155rem); }
+      .subtitle { font-size: clamp(1.89rem, 5.625vw, 2.205rem); }
+      .disclaimer { font-size: clamp(1.12rem, 3.5vw, 1.26rem); }
+      .city { font-size: clamp(1.4rem, 3.5vw, 1.6rem); }
+      .weather-icon { font-size: clamp(1.8rem, 4.5vw, 2.2rem); }
+      .temp-high { font-size: clamp(2.4rem, 7vw, 2.8rem); }
+      .temp-low { font-size: clamp(1.2rem, 3.5vw, 1.6rem); }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="bg-particles"></canvas>
+  
+  <div class="slider-panel-right">
+    <div class="slider-row">
+      <span class="slider-label">צבע כללי</span>
+      <input id="colorSlider" type="range" min="0" max="100" value="15">
+    </div>
+  </div>
+
+  <div class="season-slider">
+    <label for="seasonSlider">חורף</label>
+    <input id="seasonSlider" type="range" min="0" max="3" step="1" value="0">
+    <label for="seasonSlider">אביב</label>
+  </div>
+
+  <div class="header-wrap">
+    <input class="free-title" id="freeTitle" value="תחזית חורף" spellcheck="false">
+    <div class="datetime">יום שני, 19 במאי 2025</div>
+  </div>
+  
+  <div class="subtitle">
+    טמפרטורות החזויות להלילה ולמחר
+  </div>
+  
+  <div class="weather-groups-wrapper">
+    <div class="weather-container" id="weather-cards-old"></div>
+    <div class="weather-container" id="weather-cards"></div>
+  </div>
+  
+  <div class="disclaimer">באדיבות שירות המטאורולוגי הישראלי</div>
+
+  <script>
+    function setPalette(val) {
+      const colors = [
+        ['to bottom', '#3a7bd5', '#00d2ff'], // Dark blue to light cyan (top-to-bottom)
+        ['to bottom', '#1565c0', '#4fc3f7'], // Darker blue to lighter cyan (top-to-bottom)
+        ['to bottom', '#3a7bd5', '#00d2ff'], // Repeat
+        ['to bottom', '#1565c0', '#4fc3f7'], // Repeat
+        ['to right', '#0d47a1', '#4fc3f7'],  // Very dark blue to lighter cyan (left-to-right)
+        ['to bottom right', '#1e88e5', '#b3e5fc'], // Medium blue to very light cyan (diagonal)
+        ['to top right', '#0d47a1', '#00d2ff'], // Very dark blue to light cyan (diagonal, bottom-left to top-right)
+        ['to right', '#1565c0', '#b3e5fc']   // Darker blue to very light cyan (left-to-right)
+      ];
+      const idx = Math.floor((val / 100) * (colors.length - 1));
+      const [direction, bg1, bg2] = colors[idx];
+      document.body.style.background = `linear-gradient(${direction}, ${bg1}, ${bg2})`;
+      document.body.style.backgroundSize = '200% 200%';
+      const cardColors = [
+        ['#4fc3f7', '#1565c0'], // Light to dark blue
+        ['#00d2ff', '#3a7bd5'], // Light to dark blue
+        ['#4fc3f7', '#1565c0'], // Repeat
+        ['#00d2ff', '#3a7bd5'], // Repeat
+        ['#4fc3f7', '#0d47a1'], // Lighter cyan to very dark blue
+        ['#b3e5fc', '#1e88e5'], // Very light cyan to medium blue
+        ['#00d2ff', '#0d47a1'], // Light cyan to very dark blue
+        ['#b3e5fc', '#1565c0']  // Very light cyan to darker blue
+      ];
+      document.querySelectorAll('.weather-card').forEach(card => {
+        card.style.setProperty('--card-top', cardColors[idx][0]);
+        card.style.setProperty('--card-bot', cardColors[idx][1]);
+      });
+    }
+
+    const canvas = document.getElementById("bg-particles");
+    const ctx = canvas.getContext("2d");
+    let particles = [];
+    const PARTICLE_COUNT = 60;
+
+    function initParticles(season) {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      particles = Array.from({ length: PARTICLE_COUNT }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 3 + 1,
+        speed: season === 'winter' ? 0.05 : season === 'spring' ? 0.07 : season === 'summer' ? 0.06 : 0.08,
+        angle: Math.random() * Math.PI * 2,
+        alpha: Math.random() * 0.4 + 0.3,
+        shape: getParticleShape(season)
+      }));
+      animateParticles();
+    }
+
+    function getParticleShape(season) {
+      switch (season) {
+        case 'winter': return 'snowflake';
+        case 'spring': return 'flower';
+        case 'summer': return 'sun';
+        case 'autumn': return 'leaf';
+        default: return 'circle';
+      }
+    }
+
+    function drawParticle(p) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.fillStyle = `rgba(255,255,255,${p.alpha})`;
+      
+      switch (p.shape) {
+        case 'snowflake':
+          ctx.font = `${p.size * 2}px Arial`;
+          ctx.fillText('❄️', 0, 0);
+          break;
+        case 'flower':
+          ctx.font = `${p.size * 2}px Arial`;
+          ctx.fillText('🌸', 0, 0);
+          break;
+        case 'sun':
+          ctx.font = `${p.size * 2}px Arial`;
+          ctx.fillText('☀️', 0, 0);
+          break;
+        case 'leaf':
+          ctx.font = `${p.size * 2}px Arial`;
+          ctx.fillText('🍂', 0, 0);
+          break;
+        default:
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+          ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        p.x += Math.cos(p.angle) * p.speed;
+        p.y += Math.sin(p.angle) * p.speed;
+        
+        if (p.x < 0 || p.x > canvas.width) p.angle = Math.PI - p.angle;
+        if (p.y < 0 || p.y > canvas.height) p.angle = -p.angle;
+        
+        drawParticle(p);
+      });
+      requestAnimationFrame(animateParticles);
+    }
+
+    const weatherData = {
+      winter: [
+        [
+          {city: "ירושלים", high: 8, low: 2, icon: "❄️"},
+          {city: "תל אביב", high: 12, low: 7, icon: "🌧️"},
+          {city: "חיפה", high: 10, low: 5, icon: "🌧️"},
+          {city: "צפת", high: 6, low: 1, icon: "❄️"},
+          {city: "קצרין", high: 7, low: 2, icon: "☁️"},
+          {city: "טבריה", high: 11, low: 6, icon: "🌧️"},
+          {city: "נצרת", high: 9, low: 4, icon: "🌧️"},
+          {city: "עפולה", high: 10, low: 5, icon: "☁️"}
+        ],
+        [
+          {city: "בית שאן", high: 12, low: 7, icon: "☀️"},
+          {city: "לוד", high: 11, low: 6, icon: "🌧️"},
+          {city: "אשדוד", high: 13, low: 8, icon: "🌥️"},
+          {city: "עין גדי", high: 15, low: 9, icon: "☀️"},
+          {city: "באר שבע", high: 11, low: 5, icon: "☁️"},
+          {city: "מצפה רמון", high: 9, low: 3, icon: "❄️"},
+          {city: "אילת", high: 18, low: 10, icon: "☀️"},
+          {city: "ירושלים", high: 7, low: 1, icon: "❄️"}
+        ],
+        [
+          {city: "תל אביב", high: 11, low: 6, icon: "🌧️"},
+          {city: "חיפה", high: 9, low: 4, icon: "🌧️"},
+          {city: "צפת", high: 5, low: 0, icon: "❄️"},
+          {city: "קצרין", high: 6, low: 1, icon: "☁️"},
+          {city: "טבריה", high: 10, low: 5, icon: "🌧️"},
+          {city: "נצרת", high: 8, low: 3, icon: "🌧️"},
+          {city: "עפולה", high: 9, low: 4, icon: "☁️"},
+          {city: "בית שאן", high: 11, low: 6, icon: "☀️"}
+        ],
+        [
+          {city: "אילת", high: 18, low: 10, icon: "☀️"},
+          {city: "לוד", high: 11, low: 6, icon: "🌧️"},
+          {city: "בית שאן", high: 12, low: 7, icon: "☀️"},
+          {city: "באר שבע", high: 11, low: 5, icon: "☁️"},
+          {city: "מצפה רמון", high: 9, low: 3, icon: "❄️"},
+          {city: "עין גדי", high: 15, low: 9, icon: "☀️"},
+          {city: "ירושלים", high: 8, low: 2, icon: "❄️"},
+          {city: "תל אביב", high: 12, low: 7, icon: "🌧️"}
+        ]
+      ],
+      spring: [
+        [
+          {city: "ירושלים", high: 18, low: 10, icon: "🌤️"},
+          {city: "תל אביב", high: 20, low: 14, icon: "🌥️"},
+          {city: "חיפה", high: 19, low: 13, icon: "⛅"},
+          {city: "צפת", high: 16, low: 8, icon: "🌤️"},
+          {city: "קצרין", high: 17, low: 9, icon: "⛅"},
+          {city: "טבריה", high: 22, low: 15, icon: "☀️"},
+          {city: "נצרת", high: 18, low: 11, icon: "🌥️"},
+          {city: "עפולה", high: 20, low: 12, icon: "⛅"}
+        ],
+        [
+          {city: "בית שאן", high: 23, low: 16, icon: "☀️"},
+          {city: "לוד", high: 21, low: 14, icon: "🌥️"},
+          {city: "אשדוד", high: 22, low: 15, icon: "⛅"},
+          {city: "עין גדי", high: 25, low: 17, icon: "☀️"},
+          {city: "באר שבע", high: 24, low: 15, icon: "☀️"},
+          {city: "מצפה רמון", high: 19, low: 11, icon: "🌤️"},
+          {city: "אילת", high: 28, low: 20, icon: "☀️"},
+          {city: "ירושלים", high: 17, low: 9, icon: "🌤️"}
+        ],
+        [
+          {city: "תל אביב", high: 19, low: 13, icon: "🌥️"},
+          {city: "חיפה", high: 18, low: 12, icon: "⛅"},
+          {city: "צפת", high: 15, low: 7, icon: "🌤️"},
+          {city: "קצרין", high: 16, low: 8, icon: "⛅"},
+          {city: "טבריה", high: 21, low: 14, icon: "☀️"},
+          {city: "נצרת", high: 17, low: 10, icon: "🌥️"},
+          {city: "עפולה", high: 19, low: 11, icon: "⛅"},
+          {city: "בית שאן", high: 22, low: 15, icon: "☀️"}
+        ],
+        [
+          {city: "אילת", high: 28, low: 20, icon: "☀️"},
+          {city: "לוד", high: 21, low: 14, icon: "🌥️"},
+          {city: "בית שאן", high: 23, low: 16, icon: "☀️"},
+          {city: "באר שבע", high: 24, low: 15, icon: "☀️"},
+          {city: "מצפה רמון", high: 19, low: 11, icon: "🌤️"},
+          {city: "עין גדי", high: 25, low: 17, icon: "☀️"},
+          {city: "ירושלים", high: 18, low: 10, icon: "🌤️"},
+          {city: "תל אביב", high: 20, low: 14, icon: "🌥️"}
+        ]
+      ],
+      summer: [
+        [
+          {city: "ירושלים", high: 28, low: 20, icon: "☀️"},
+          {city: "תל אביב", high: 30, low: 24, icon: "🌤️"},
+          {city: "חיפה", high: 27, low: 22, icon: "⛅"},
+          {city: "צפת", high: 25, low: 17, icon: "🌥️"},
+          {city: "קצרין", high: 26, low: 18, icon: "☀️"},
+          {city: "טבריה", high: 32, low: 25, icon: "☀️"},
+          {city: "נצרת", high: 29, low: 21, icon: "🌤️"},
+          {city: "עפולה", high: 31, low: 23, icon: "☀️"}
+        ],
+        [
+          {city: "בית שאן", high: 34, low: 26, icon: "☀️"},
+          {city: "לוד", high: 32, low: 24, icon: "🌤️"},
+          {city: "אשדוד", high: 31, low: 23, icon: "⛅"},
+          {city: "עין גדי", high: 35, low: 27, icon: "☀️"},
+          {city: "באר שבע", high: 33, low: 25, icon: "☀️"},
+          {city: "מצפה רמון", high: 29, low: 20, icon: "🌥️"},
+          {city: "אילת", high: 38, low: 29, icon: "☀️"},
+          {city: "ירושלים", high: 27, low: 19, icon: "☀️"}
+        ],
+        [
+          {city: "תל אביב", high: 29, low: 23, icon: "🌤️"},
+          {city: "חיפה", high: 26, low: 21, icon: "⛅"},
+          {city: "צפת", high: 24, low: 16, icon: "🌥️"},
+          {city: "קצרין", high: 25, low: 17, icon: "☀️"},
+          {city: "טבריה", high: 31, low: 24, icon: "☀️"},
+          {city: "נצרת", high: 28, low: 20, icon: "🌤️"},
+          {city: "עפולה", high: 30, low: 22, icon: "☀️"},
+          {city: "בית שאן", high: 33, low: 25, icon: "☀️"}
+        ],
+        [
+          {city: "אילת", high: 38, low: 29, icon: "☀️"},
+          {city: "לוד", high: 32, low: 24, icon: "🌤️"},
+          {city: "בית שאן", high: 34, low: 26, icon: "☀️"},
+          {city: "באר שבע", high: 33, low: 25, icon: "☀️"},
+          {city: "מצפה רמון", high: 29, low: 20, icon: "🌥️"},
+          {city: "עין גדי", high: 35, low: 27, icon: "☀️"},
+          {city: "ירושלים", high: 28, low: 20, icon: "☀️"},
+          {city: "תל אביב", high: 30, low: 24, icon: "🌤️"}
+        ]
+      ],
+      autumn: [
+        [
+          {city: "ירושלים", high: 20, low: 12, icon: "🌧️"},
+          {city: "תל אביב", high: 22, low: 16, icon: "🌧️"},
+          {city: "חיפה", high: 20, low: 14, icon: "🌥️"},
+          {city: "צפת", high: 17, low: 9, icon: "🌧️"},
+          {city: "קצרין", high: 18, low: 10, icon: "🌧️"},
+          {city: "טבריה", high: 24, low: 17, icon: "☀️"},
+          {city: "נצרת", high: 19, low: 11, icon: "🌥️"},
+          {city: "עפולה", high: 21, low: 13, icon: "⛅"}
+        ],
+        [
+          {city: "בית שאן", high: 25, low: 18, icon: "☀️"},
+          {city: "לוד", high: 23, low: 15, icon: "🌧️"},
+          {city: "אשדוד", high: 22, low: 14, icon: "⛅"},
+          {city: "עין גדי", high: 26, low: 19, icon: "☀️"},
+          {city: "באר שבע", high: 24, low: 16, icon: "☀️"},
+          {city: "מצפה רמון", high: 20, low: 12, icon: "🌧️"},
+          {city: "אילת", high: 29, low: 21, icon: "☀️"},
+          {city: "ירושלים", high: 19, low: 11, icon: "🌧️"}
+        ],
+        [
+          {city: "תל אביב", high: 21, low: 15, icon: "🌧️"},
+          {city: "חיפה", high: 19, low: 13, icon: "🌥️"},
+          {city: "צפת", high: 16, low: 8, icon: "🌧️"},
+          {city: "קצרין", high: 17, low: 9, icon: "🌧️"},
+          {city: "טבריה", high: 23, low: 16, icon: "☀️"},
+          {city: "נצרת", high: 18, low: 10, icon: "🌥️"},
+          {city: "עפולה", high: 20, low: 12, icon: "⛅"},
+          {city: "בית שאן", high: 24, low: 17, icon: "☀️"}
+        ],
+        [
+          {city: "אילת", high: 29, low: 21, icon: "☀️"},
+          {city: "לוד", high: 23, low: 15, icon: "🌧️"},
+          {city: "בית שאן", high: 25, low: 18, icon: "☀️"},
+          {city: "באר שבע", high: 24, low: 16, icon: "☀️"},
+          {city: "מצפה רמון", high: 20, low: 12, icon: "🌧️"},
+          {city: "עין גדי", high: 26, low: 19, icon: "☀️"},
+          {city: "ירושלים", high: 20, low: 12, icon: "🌧️"},
+          {city: "תל אביב", high: 22, low: 16, icon: "🌧️"}
+        ]
+      ]
+    };
+
+    let currentGroupIndex = 0;
+    let rotationInterval;
+    let isAnimating = false;
+    let currentSeason = 'winter';
+    
+    function renderCards(containerId, data) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      
+      data.forEach((city, index) => {
+        const card = document.createElement('div');
+        card.className = 'weather-card';
+        card.innerHTML = `
+          <div class="city">${city.city}</div>
+          <div class="weather-icon">${city.icon}</div>
+          <div class="temp-container">
+            <div class="temp-high">${city.high}°</div>
+            <div class="temp-low"><span class="moon-icon">🌙</span>${city.low}°</div>
+          </div>
+        `;
+        card.style.transitionDelay = `${index * 100}ms`;
+        container.appendChild(card);
+      });
+      
+      setTimeout(() => {
+        container.querySelectorAll('.weather-card').forEach(card => {
+          card.classList.add('grow');
+        });
+      }, 50);
+    }
+
+    function rotateCities() {
+      if (isAnimating) return;
+      isAnimating = true;
+      
+      const oldContainer = document.getElementById('weather-cards-old');
+      const newContainer = document.getElementById('weather-cards');
+      let data = [...weatherData[currentSeason][currentGroupIndex]];
+      
+      data.push(data.shift());
+      weatherData[currentSeason][currentGroupIndex] = data;
+      
+      renderCards('weather-cards', data);
+      
+      const oldCards = oldContainer.querySelectorAll('.weather-card');
+      oldCards.forEach((card, index) => {
+        setTimeout(() => {
+          card.classList.add('exit');
+          if (index === oldCards.length - 1) {
+            setTimeout(() => {
+              oldContainer.innerHTML = newContainer.innerHTML;
+              newContainer.innerHTML = '';
+              isAnimating = false;
+            }, 500);
+          }
+        }, index * 100);
+      });
+    }
+
+    function rotateGroups() {
+      if (isAnimating) return;
+      currentGroupIndex = (currentGroupIndex + 1) % weatherData[currentSeason].length;
+      renderCards('weather-cards-old', weatherData[currentSeason][currentGroupIndex]);
+    }
+
+    function startRotation() {
+      clearInterval(rotationInterval);
+      rotationInterval = setInterval(() => {
+        rotateCities();
+        if (rotationCount % 3 === 0) {
+          rotateGroups();
+        }
+        rotationCount++;
+      }, 7000);
+    }
+
+    let rotationCount = 0;
+
+    document.getElementById('colorSlider').addEventListener('input', e => {
+      setPalette(e.target.value);
+    });
+
+    document.getElementById('seasonSlider').addEventListener('input', e => {
+      const seasons = ['winter', 'spring', 'summer', 'autumn'];
+      const seasonNames = ['חורף', 'אביב', 'קיץ', 'סתיו'];
+      currentSeason = seasons[e.target.value];
+      currentGroupIndex = 0;
+      
+      document.getElementById('freeTitle').value = `תחזית ${seasonNames[e.target.value]}`;
+      
+      const seasonSliderLabels = document.querySelectorAll('.season-slider label');
+      seasonSliderLabels[0].textContent = seasonNames[e.target.value];
+      seasonSliderLabels[1].textContent = e.target.value < 3 ? seasonNames[e.target.value+1] : '';
+      
+      setPalette(document.getElementById('colorSlider').value);
+      initParticles(currentSeason);
+      renderCards('weather-cards-old', weatherData[currentSeason][currentGroupIndex]);
+      startRotation();
+    });
+
+    window.addEventListener('load', () => {
+      currentSeason = 'winter';
+      initParticles(currentSeason);
+      renderCards('weather-cards-old', weatherData[currentSeason][currentGroupIndex]);
+      startRotation();
+    });
+
+    window.addEventListener('resize', () => {
+      initParticles(currentSeason);
+    });
+  </script>
+</body>
+</html>
