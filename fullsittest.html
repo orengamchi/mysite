@@ -1,0 +1,2357 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oren Gamchi - Interactive Portfolio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet">
+
+  <style>
+    /* הגדרות משתני CSS עבור ערכות נושא */
+    :root {
+      --mode-bg: #1a1a2e; /* צבע רקע ראשי (ברירת מחדל - סייבר) */
+      --icon-color: #e94560; /* צבע אייקון ומרכיבים אינטראקטיביים */
+      --overlay-text: #ffffff; /* צבע טקסט על גבי שכבת העל */
+      --overlay-font: "VT323", monospace; /* פונט לשכבת העל */
+      --transition-duration: 0.8s; /* משך אנימציית מעבר ברירת מחדל של השקופיות */
+      --icon-animation-duration: 2.5s; /* משך אנימציית האייקון (פי 5 מ-0.5s) */
+      --transition-timing: cubic-bezier(0.165, 0.84, 0.44, 1); /* פונקציית תזמון לאנימציה */
+      --slide-bg-color: transparent; /* משתנה CSS לצבע רקע השקופית הנוכחית (משמש ל-::before) */
+    }
+
+    /* איפוס סגנונות ברירת מחדל */
+    * {
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+      touch-action: manipulation; /* מונע פעולות מגע ברירת מחדל כמו זום בלחיצה כפולה */
+    }
+
+    /* הגדרות גובה ורוחב מלאות לגוף הדף ול-html */
+    html, body {
+      width:100%;
+      height:100%;
+      overflow:hidden; /* מונע גלילה */
+      background:var(--mode-bg); /* רקע לפי משתנה CSS */
+      /* רקע דינמי בסגנון סייבר ייקבע כאן ע"י JS */
+    }
+
+    /* סגנונות גוף הדף */
+    body {
+      font-family:Arial, sans-serif;
+      transition: all 0.5s ease; /* אנימציית מעבר חלקה */
+      -webkit-text-size-adjust: none; /* מונע התאמת גודל טקסט במובייל */
+    }
+
+    /* הגדרות סצנה תלת מימדית */
+    .scene {
+      width:100%;
+      height:100%;
+      perspective:1200px; /* עומק פרספקטיבה */
+      position:relative;
+      overflow: hidden;
+    }
+
+    /* שכבת רקע דינמית מאחורי השקופיות (משמשת כעת בעיקר לרקע אחיד במצבים לא סייבר) */
+    .scene::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: var(--slide-bg-color); /* צבע רקע מהמשתנה */
+        z-index: 1; /* מאחורי השקופיות */
+        /* אנימציית מעבר צבע - משתמשת במשתנה CSS */
+        transition: background-color var(--transition-duration) var(--transition-timing);
+    }
+
+    /* החלשת מעבר צבע הרקע במצב סייבר (לא רלוונטי ל-::before בגלל שקיפות) */
+    body.style-cyber .scene::before {
+        transition-duration: var(--transition-duration); /* שמירה על משך רגיל */
+    }
+
+
+    /* מכל השקופיות - מאפשר טרנספורמציות תלת מימדיות */
+    .slides {
+      width:100%;
+      height:100%;
+      transform-style:preserve-3d;
+      transition:transform var(--transition-duration) var(--transition-timing); /* אנימציית מעבר בין שקופיות */
+      z-index: 2; /* מעל שכבת הרקע הדינמית */
+      position: relative; /* נדרש עבור z-index */
+    }
+
+    /* סגנונות שקופית בודדת */
+    .slide {
+      position:absolute;
+      width:100%;
+      height:100%;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      backface-visibility:hidden; /* מסתיר את גב האלמנט בטרנספורמציה תלת מימדית */
+      overflow:hidden;
+      transition:
+        opacity var(--transition-duration) var(--transition-timing),
+        transform var(--transition-duration) var(--transition-timing),
+        filter var(--transition-duration) var(--transition-timing);
+      transform-origin: center center;
+      opacity: 0.3; /* שקיפות ברירת מחדל */
+      filter: blur(2px); /* טשטוש ברירת מחדל */
+      background-color: rgba(0,0,0,0.2); /* רקע בסיסי שקוף למחצה */
+      border: none; /* הסרת גבול ברירת מחדל */
+    }
+
+    /* סגנונות שקופית פעילה */
+    .slide.active {
+      opacity: 1; /* שקיפות מלאה */
+      filter: blur(0); /* ללא טשטוש */
+      z-index: 3; /* מעב שקופיות אחרות ושכבת הרקע */
+    }
+
+    /* סגנונות קנבס בתוך שקופית */
+    .slide canvas {
+      position:absolute;
+      top:0;
+      left:0;
+      width:100%;
+      height:100%;
+      filter: blur(4px); /* טשטוש ברירת מחדל לקנבס */
+      transition:filter var(--transition-duration) var(--transition-timing);
+      z-index: 0;
+    }
+
+    /* סגנונות קנבס בתוך שקופית פעילה */
+    .slide.active canvas {
+      filter: blur(0); /* ללא טשטוש בקנבס הפעיל */
+    }
+
+    /* סגנונות שכבת העל (טקסט) */
+    .overlay {
+      position:absolute;
+      top:30%;
+      left:50%;
+      transform:translate(-50%,-50%);
+      pointer-events:none; /* אירועי עכבר יעברו דרך האלמנט */
+      text-align:center;
+      opacity:0; /* שקיפות ברירת מחדל */
+      transition:opacity var(--transition-duration) var(--transition-timing); /* אנימציית הופעה */
+      z-index:4; /* מעב השקופית */
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+
+    /* סגנונות שכבת העל בשקופית פעילה */
+    .slide.active .overlay {
+      opacity:1; /* שקיפות מלאה */
+      animation: float 3s ease-in-out infinite; /* אנימציית ריחוף */
+    }
+
+    /* אנימציית ריחוף */
+    @keyframes float {
+      0%, 100% { transform: translate(-50%, -55%); }
+      50% { transform: translate(-50%, -50%); }
+    }
+
+    /* סגנונות כותרות בשכבת העל */
+    .overlay h1, .overlay h2 {
+      font-family: var(--overlay-font);
+      color: var(--overlay-text);
+      text-transform: uppercase;
+      letter-spacing:2px;
+      margin: 0.2em 0;
+    }
+
+    .overlay h1 {
+      font-size:2.1em;
+      text-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+
+    .overlay h2 {
+      font-size:1.4em;
+    }
+
+    /* בניית אייקון - ממורכז בתוך אזור התצוגה */
+    .icon-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5; /* מעב הכל */
+      pointer-events: auto; /* מאפשר אירועי עכבר */
+      cursor: pointer; /* סמן עכבר מצביע */
+    }
+
+    .icon-construction {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d; /* מאפשר טרנספורמציות תלת מימדיות לילדים */
+    }
+
+    .icon-part {
+      position: absolute;
+      background: var(--icon-color); /* צבע חלק האייקון */
+      opacity: 0; /* שקיפות ברירת מחדל */
+      transform: scale(0.5) translate3d(0,0,0) rotateY(0deg) rotateZ(0deg); /* הגדרת טרנספורמציה התחלתית */
+      transition: none; /* הסרת מעבר ברירת המודל */
+      border-radius: 50%; /* ברירת מחדל - עיגול, נדרס ע"י סגנונות ספציפיים לצורה */
+      transform-origin: center;
+    }
+
+    /* קווי תנועה לצורות */
+    .icon-part::before {
+      content: '';
+      position: absolute;
+      background: rgba(255,255,255,0.3);
+      transform-origin: center;
+      pointer-events: none; /* אירועי עכבר יעברו דרך האלמנט */
+    }
+
+    /* סגנונות חלק האייקון בשקופית פעילה */
+    .slide.active .icon-part {
+      opacity: 1; /* שקיפות מלאה */
+      transform: scale(1) translate3d(0,0,0) rotateY(0deg) rotateZ(0deg); /* מצב מורכב */
+    }
+
+    /* אנימציות מעבר לאייקון - פירוק והרכבה תלת מימדית */
+    .icon-part.construct {
+      animation: construct var(--icon-animation-duration) ease-out forwards;
+    }
+
+    .icon-part.deconstruct {
+      animation: deconstruct var(--icon-animation-duration) ease-in forwards;
+    }
+
+    @keyframes construct {
+      0% {
+        opacity: 0;
+        /* התחלה מפוזרת, קטנה, רחוקה, מסובבת */
+        transform: scale(0.3)
+                   translate3d(var(--scatter-x, 0), var(--scatter-y, 0), var(--scatter-z, -800px))
+                   rotateY(var(--rotateY-start, 0deg))
+                   rotateZ(var(--rotateZ-start, 0deg));
+      }
+      50% {
+        opacity: 0.7;
+         /* מצב ביניים */
+        transform: scale(0.7)
+                   translate3d(var(--scatter-x, 0) * 0.5, var(--scatter-y, 0) * 0.5, var(--scatter-z, -800px) * 0.5)
+                   rotateY(var(--rotateY-start, 0deg) + 180deg)
+                   rotateZ(var(--rotateZ-start, 0deg) + 180deg);
+      }
+      100% {
+        opacity: 1;
+        /* סיום מורכב */
+        transform: scale(1)
+                   translate3d(0, 0, 0)
+                   rotateY(var(--rotateY-start, 0deg) + 360deg)
+                   rotateZ(var(--rotateZ-start, 360deg));
+      }
+    }
+
+    @keyframes deconstruct {
+      0% {
+        opacity: 1;
+        /* התחלה מורכבת */
+        transform: scale(1)
+                   translate3d(0, 0, 0)
+                   rotateY(0deg)
+                   rotateZ(0deg);
+      }
+       50% {
+        opacity: 0.7;
+         /* מצב ביניים */
+        transform: scale(0.7)
+                   translate3d(var(--scatter-x, 0) * 0.5, var(--scatter-y, 0) * 0.5, var(--scatter-z, -800px) * 0.5)
+                   rotateY(180deg)
+                   rotateZ(180deg);
+      }
+      100% {
+        opacity: 0;
+        /* סיום מפוזר, קטן, רחוק, מסובב */
+        transform: scale(0.3)
+                   translate3d(var(--scatter-x, 0), var(--scatter-y, 0), var(--scatter-z, -800px))
+                   rotateY(360deg)
+                   rotateZ(360deg);
+      }
+    }
+
+
+    /* אייקונים ספציפיים לצורה עם קווי תנועה - סגנונות בסיסיים */
+    .slide[data-shape="circle"] .icon-part { border-radius: 50%; }
+    .slide[data-shape="square"] .icon-part { border-radius: 5px; }
+    .slide[data-shape="triangle"] .icon-part { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); border-radius: 0; }
+    .slide[data-shape="hexagon"] .icon-part { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); border-radius: 0; }
+    .slide[data-shape="star"] .icon-part { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); border-radius: 0; }
+    .slide[data-shape="diamond"] .icon-part { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); border-radius: 0; }
+    .slide[data-shape="line"] .icon-part { clip-path: polygon(0% 45%, 100% 45%, 100% 55%, 0% 55%); border-radius: 0; }
+    .slide[data-shape="cross"] .icon-part { clip-path: polygon(45% 0%, 55% 0%, 55% 45%, 100% 45%, 100% 55%, 55% 55%, 55% 100%, 45% 100%, 45% 55%, 0% 55%, 0% 45%, 45% 45%); border-radius: 0; }
+    .slide[data-shape="spiral"] .icon-part { clip-path: circle(50% at 50% 50%); }
+    .slide[data-shape="wave"] .icon-part { clip-path: polygon(0% 50%, 10% 40%, 20% 50%, 30% 40%, 40% 50%, 50% 40%, 60% 50%, 70% 40%, 80% 50%, 90% 40%, 100% 50%, 90% 60%, 80% 50%, 70% 60%, 60% 50%, 50% 60%, 40% 50%, 30% 60%, 20% 50%, 10% 60%, 0% 50%); border-radius: 0; }
+    .slide[data-shape="grid"] .icon-part { clip-path: polygon(0% 0%, 0% 100%, 10% 100%, 10% 10%, 90% 10%, 90% 90%, 10% 90%, 10% 100%, 100% 100%, 100% 0%); border-radius: 0; }
+    .slide[data-shape="bubbles"] .icon-part { clip-path: circle(50% at 50% 50%); }
+
+
+    /* אנימציות קווי תנועה */
+    @keyframes rotateLine {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes pulseLine {
+      0%, 100% { opacity: 0.3; width: 150%; }
+      50% { opacity: 1; width: 200%; }
+    }
+
+    @keyframes spiralLine {
+      0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.5); opacity: 0; }
+      50% { transform: translate(-50%, -50%) rotate(180deg) scale(1); opacity: 1; }
+      100% { opacity: 1; transform: translate(-50%, -50%) rotate(360deg) scale(1); } /* נשאר גלוי בסוף */
+    }
+
+    @keyframes waveLine {
+      0%, 100% { transform: translate(-50%, -50%) rotate(0deg) translateY(0); }
+      25% { transform: translate(-50%, -50%) rotate(0deg) translateY(-10px); }
+      50% { transform: translate(-50%, -50%) rotate(0deg) translateY(0); }
+      75% { transform: translate(-50%, -50%) rotate(0deg) translateY(10px); }
+    }
+
+
+    /* סגנונות מודאל (חלון קופץ) */
+    .modal {
+      display: none; /* מוסתר כברירת מחדל */
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90%;
+      height: 90%;
+      background: transparent; /* רקע שקוף */
+      border: none; /* ללא גבול */
+      border-radius: 10px;
+      z-index: 1000;
+      overflow: hidden;
+      padding: 0; /* ללא ריפוד פנימי */
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      animation: modalFadeIn 0.3s ease-out; /* אנימציית הופעה */
+      /* הוספת ריפוד כדי לפנות מקום לכפתור הסגירה מחוץ לתוכן */
+      padding-top: 30px; /* או גודל מתאים אחר */
+      padding-left: 10px; /* או גודל מתאים אחר */
+      padding-right: 10px; /* או גודל מתאים אחר */
+      padding-bottom: 10px; /* או גודל מתאים אחר */
+    }
+
+    /* סגנונות מודאל פעיל */
+    .modal.active {
+      display: flex; /* מוצג כ-flex container */
+    }
+
+    .modal-content {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+      display: flex; /* שימוש ב-flexbox למרכוז וידאו/iframe */
+      justify-content: center;
+      align-items: center;
+      /* רקע לתוכן המודאל כדי להפריד אותו מהרקע השקוף של המודאל */
+      background-color: transparent; /* רקע שקוף לחלוטין לתוכן המודאל */
+      border-radius: 8px; /* פינות מעוגלות לתוכן */
+      padding: 10px; /* ריפוד פנימי לתוכן */
+      box-sizing: border-box; /* ודא שהריפוד כלול בגודל */
+    }
+
+    .modal-content video {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain; /* מבטיח שהוידאו יתאים למכל */
+    }
+
+    /* הסתרת כותרות מודאל */
+    .modal-content h2 {
+        display: none;
+    }
+
+    /* סגנונות ספציפיים לתוכן מצלמה (Camera Tracker) בתוך מודאל */
+    #modal-line .modal-content > div, /* מיקוד על ה-div שעוטף את תוכן ה-camera tracker */
+    #modal-diamond .modal-content > div /* מיקוד על ה-div שעוטף את תוכן ה-camera tracker ב-Motion Graphics */
+     {
+        width: 100%;
+        height: 100%;
+        display: flex; /* שימוש ב-flex למרכוז תוכן בתוך ה-div */
+        flex-direction: column; /* ערימת אלמנטים של camera tracker אנכית */
+        justify-content: flex-start; /* יישור פריטים לתחילת המכל */
+        align-items: center;
+        overflow: auto; /* מאפשר גלילה אם התוכן גולש */
+        padding: 10px; /* הוספת ריפוד פנימי לעוטף ה-camera tracker */
+        background: none; /* הסרת רקע כפול אם יש */
+    }
+
+
+    #modal-line .modal-content video,
+    #modal-line .modal-content canvas#overlay,
+    #modal-diamond .modal-content video, /* סגנון וידאו ב-Motion Graphics */
+    #modal-diamond .modal-content canvas#overlay /* סגנון קנבס ב-Motion Graphics */
+     {
+        position: relative !important; /* דריסה של מיקום קבוע */
+        top: auto !important;
+        left: auto !important;
+        transform: none !important; /* הסרת טרנספורמציה אם הייתה */
+        width: 100% !important; /* וידאו/קנבס ימלאו את רוחב העוטף */
+        height: auto !important; /* שמירה על יחס גובה-רוחב */
+        object-fit: contain !important; /* מבטיח וידאו/קנבס יתאימו ללא חיתוך */
+        z-index: 1; /* מבטיח שכבות נכונות */
+    }
+
+    #modal-line .modal-content #headerBar,
+    #modal-line .modal-content #modeBar,
+    #modal-line .modal-content #shapeBar,
+    #modal-line .modal-content #controls,
+    #modal-line .modal-content #camera-button-container /* סגנון למכל הכפתור החדש */
+     {
+        position: relative !important; /* דריסה של מיקום קבוע */
+        top: auto !important;
+        left: auto !important;
+        transform: none !important;
+        width: 100% !important; /* סרגלי בקרה ימלאו את הרוחב */
+        z-index: 2; /* מעב וידאו/קנבס */
+        padding: 8px; /* הוספת ריפוד לבקרים */
+        background: rgba(0,0,0,0.7); /* הוספת רקע לקריאות */
+        border-radius: 8px;
+        margin-top: 10px; /* הוספת רווח בין אלמנטים */
+        box-sizing: border-box;
+        font-family: 'Press Start 2P', monospace; /* החלת פונט קומיקס על בקרים */
+        color: #0f0; /* צבע טקסט ירוק */
+    }
+
+     #modal-line .modal-content #headerBar {
+         justify-content: space-between; /* פיזור תוכן סרגל הכותרת */
+         gap: 10px; /* הוספת רווח בין אלמנטי כותרת */
+     }
+
+     #modal-line .modal-content #headerBar button,
+     #modal-line .modal-content #headerBar a,
+     #modal-line .modal-content #camera-button-container button /* סגנון לכפתור החדש */
+      {
+         font-family: 'Press Start 2P', monospace; /* החלת פונט קומיקס על כפתורים/קישורים */
+         font-size: 12px;
+         color: #0f0;
+         background: rgba(0,0,0,0.5);
+         border: 1px solid #0f0;
+         padding: 4px;
+         border-radius: 4px;
+         text-decoration: none;
+         cursor: pointer;
+     }
+
+
+    #modal-line .modal-content #modeBar {
+        flex-direction: row; /* סידור כפתורי מצב אופקית */
+        flex-wrap: wrap; /* מאפשר גלישת כפתורים במסכים קטנים */
+        justify-content: center; /* מרכוז כפתורי מצב אופקית */
+        gap: 6px; /* הוספת רווח בין כפתורי מצב */
+    }
+
+     #modal-line .modal-content #modeBar .modeBtn {
+         font-family: 'Press Start 2P', monospace; /* החלת פונט קומיקס על כפתורי מצב */
+         font-size: 10px;
+         color: #0f0;
+         background: rgba(0,0,0,0.5);
+         border: 1px solid #0f0;
+         padding: 4px;
+         border-radius: 4px;
+         cursor: pointer;
+     }
+
+     #modal-line .modal-content #modeBar .modeBtn.active {
+         background: #0f0;
+         color: #000;
+     }
+
+     #modal-line .modal-content #shapeBar {
+        flex-direction: row; /* סידור כפתורי צורה אופקית */
+        flex-wrap: wrap; /* מאפשר גלישת כפתורים */
+        justify-content: center; /* מרכוז כפתורי צורה אופקית */
+        gap: 6px; /* הוספת רווח בין כפתורי צורה */
+     }
+
+     #modal-line .modal-content .shapeBtn {
+         font-size: 22px;
+         color: #0f0;
+         cursor: pointer;
+         text-shadow: 0 0 4px #0f0;
+         padding: 3px;
+         border-radius: 3px;
+     }
+
+     #modal-line .modal-content .shapeBtn.selected {
+         background: rgba(0,255,0,0.2);
+     }
+
+
+    #modal-line .modal-content #controls {
+        flex-direction: column; /* שמירת מחוונים אנכית */
+        align-items: center; /* מרכוז מחוונים */
+        gap: 6px;
+    }
+
+    #modal-line .modal-content #controls input[type=range] {
+        width: 95% !important; /* מחוונים יתפסו יותר רוחב */
+        max-width: 400px; /* רוחב מקסימלי למחוונים */
+        -webkit-appearance: none;
+        height: 6px;
+        background: #444;
+        border-radius: 3px;
+    }
+
+     #modal-line .modal-content #controls input[type=range]::-webkit-slider-thumb {
+         -webkit-appearance: none;
+         width: 18px;
+         height: 18px;
+         border-radius: 50%;
+         background: #fff;
+         border: 2px solid #ccc;
+     }
+
+    /* סגנון למכל הכפתור החדש */
+    #modal-line .modal-content #camera-button-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 10px; /* רווח מתחת לכפתור */
+    }
+
+    /* סגנונות ספציפיים ל-mousqito_cam_v2 בתוך מודאל Motion Graphics */
+    #modal-diamond .modal-content {
+        background-color: #000; /* רקע שחור ל-camera tracker */
+        padding: 0; /* הסרת ריפוד פנימי אם יש */
+    }
+
+    #modal-diamond .modal-content video,
+    #modal-diamond .modal-content canvas#overlay {
+        position: absolute; /* מיקום אבסולוטי בתוך modal-content */
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* כיסוי מלא של המכל */
+    }
+
+    #modal-diamond .modal-content #messageBox {
+        position: absolute; /* מיקום אבסולוטי בתוך modal-content */
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        z-index: 10;
+        display: none; /* מוסתר כברירת מחדל */
+        text-align: center;
+        font-family: Arial, sans-serif; /* פונט ברירת מחדל להודעה */
+    }
+
+    /* כפתור סגירת מודאל - מחוץ לתוכן המודאל */
+    .modal-close {
+      position: absolute;
+      top: 0px; /* מחוץ לריפוד העליון של המודאל */
+      right: 0px; /* מחוץ לריפוד הימני של המודאל */
+      background: transparent;
+      border: none;
+      color: var(--icon-color);
+      font-size: 1.5em;
+      cursor: pointer;
+      transition: transform 0.2s;
+      z-index: 1001;
+      padding: 5px; /* הוספת ריפוד כדי להקל על הלחיצה */
+    }
+
+    .modal-close:hover,
+    .modal-close:focus {
+      transform: scale(1.2);
+      outline: none;
+    }
+
+    /* אנימציית הופעת מודאל */
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: translate(-50%, -60%); }
+      to { opacity: 1; transform: translate(-50%, -50%); }
+    }
+
+    /* סגנונות iframe לתוכן */
+    .modal-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: transparent;
+    }
+
+    /* ספינר טעינה */
+    .modal-loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 40px;
+      border: 4px solid var(--icon-color);
+      border-top: 4px solid transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite; /* אנימציית סיבוב */
+      z-index: 1000;
+    }
+
+    /* אנימציית סיבוב */
+    @keyframes spin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* בקרות ניווט (מחליף סגנונות) */
+    .style-switcher {
+      position:absolute;
+      top:10px;
+      left:50%;
+      transform:translateX(-50%);
+      display:flex;
+      gap:8px;
+      z-index:11;
+    }
+
+    .style-switcher button {
+      background: transparent;
+      border: none;
+      color: var(--icon-color);
+      font-size: 1.5em; /* גודל פונט גדול יותר לאייקונים */
+      cursor: pointer;
+      transition: all 0.3s ease;
+      opacity: 0.7;
+      padding: 8px; /* ריפוד גדול יותר לאייקונים */
+      border-radius: 50%; /* פינות מעוגלות לאייקונים */
+      font-family: Arial, sans-serif; /* פונט נקי */
+      font-weight: normal; /* ביטול הדגשה */
+    }
+
+    .style-switcher button:hover,
+    .style-switcher button:focus {
+      opacity: 1;
+      transform: scale(1.1);
+      outline: none;
+    }
+
+    .style-switcher button.active {
+      opacity: 1;
+      text-shadow: 0 0 5px var(--icon-color);
+      font-weight: normal; /* ביטול הדגשה */
+    }
+
+    /* בקרות ניווט למובייל */
+    .mobile-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      z-index: 100;
+      opacity: 0.7;
+    }
+
+    .mobile-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.5);
+      border: 2px solid var(--icon-color);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5em;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .mobile-btn:active {
+      transform: scale(0.9);
+      background: rgba(0,0,0,0.7);
+    }
+
+    /* סגנונות רספונסיביים */
+    @media (max-width: 768px) {
+      :root {
+        --transition-duration: 0.6s;
+        --icon-animation-duration: 2s; /* התאמת משך אנימציה למובייל */
+      }
+
+      .overlay h1 { font-size: 1.8em; }
+      .overlay h2 { font-size: 1.2em; }
+      .icon-container { width: 100px; height: 100px; }
+      .modal { padding: 15px; } /* הוחזר ריפוד למסכים קטנים יותר */
+
+      #modal-line .modal-content > div, /* עדכון סלקטור ל-camera tracker */
+      #modal-diamond .modal-content > div, /* עדכון סלקטור ל-Motion Graphics */
+      #modal-line .modal-content #headerBar,
+      #modal-line .modal-content #modeBar,
+      #modal-line .modal-content #shapeBar,
+      #modal-line .modal-content #controls,
+      #modal-line .modal-content #camera-button-container /* סגנון למכל הכפתור החדש */
+       {
+          flex-direction: column; /* ערימת בקרים אנכית במסכים קטנים יותר */
+          align-items: center; /* מרכוז בקרים */
+      }
+
+      #modal-line .modal-content #headerBar {
+          justify-content: center; /* מרכוז פריטי כותרת כשהם ערומים */
+      }
+
+       .style-switcher button {
+           font-size: 1.2em; /* גודל פונט קטן יותר במובייל */
+           padding: 6px; /* ריפוד קטן יותר במובייל */
+       }
+    }
+
+    @media (max-width: 480px) {
+      :root {
+        --transition-duration: 0.5s;
+        --icon-animation-duration: 1.5s; /* התאמת משך אנימציה למובייל */
+      }
+
+      .overlay h1 { font-size: 1.5em; }
+      .overlay h2 { font-size: 1em; }
+      .icon-container { width: 80px; height: 80px; }
+      .mobile-controls { gap: 30px; }
+      .mobile-btn { width: 40px; height: 40px; font-size: 1.2em; }
+      .modal { padding: 10px; } /* הוחזר ריפוד למסכים קטנים יותר */
+
+      #modal-line .modal-content > div, /* עדכון סלקטור ל-camera tracker */
+      #modal-diamond .modal-content > div, /* עדכון סלקטור ל-Motion Graphics */
+      #modal-line .modal-content #headerBar,
+      #modal-line .modal-content #modeBar,
+      #modal-line .modal-content #shapeBar,
+      #modal-line .modal-content #controls,
+      #modal-line .modal-content #camera-button-container /* סגנון למכל הכפתור החדש */
+       {
+          flex-direction: column; /* ערימת בקרים אנכית במסכים קטנים יותר */
+          align-items: center; /* מרכוז בקרים */
+      }
+
+       #modal-line .modal-content #headerBar {
+          justify-content: center; /* מרכוז פריטי כותרת כשהם ערומים */
+      }
+
+       .style-switcher button {
+           font-size: 1em; /* גודל פונט קטן עוד יותר במובייל */
+           padding: 4px; /* ריפוד קטן עוד יותר במובייל */
+       }
+    }
+
+    /* הסתרת בקרות מובייל במכשירים עם תמיכה בריחוף (עכבר) */
+    @media (hover: hover) {
+      .mobile-controls { display: none; }
+    }
+
+    /* ערכות סגנון (Themes) */
+    body.style-cyber {
+         /* הגדרות סגנון סייבר */
+        --mode-bg: #1a1a2e; /* צבע רקע ראשי */
+        --icon-color: #e94560; /* צבע אייקון ומרכיבים אינטראקטיביים */
+        --overlay-text: #ffffff; /* צבע טקסט על גבי שכבת העל */
+        --overlay-font: "VT323", monospace; /* פונט לשכבת העל */
+        border: none; /* הסרת גבול אם היה */
+        /* רקע דינמי בסגנון סייבר ייקבע כאן ע"י JS */
+        background-color: var(--mode-bg); /* רקע בסיסי */
+        /* הוסר ה-background-image הסטטי מכאן */
+    }
+
+     body.style-cyber .slide {
+        /* שחזור רקעים ספציפיים לצורה בסגנון סייבר */
+        /* הוסר רקע צבע אחיד כדי לחשוף את הגריד שמאחור */
+        background: transparent; /* רקע שקוף */
+        filter: blur(2px);
+        border: none;
+     }
+
+     body.style-cyber .slide.active {
+        filter: blur(0);
+     }
+
+     body.style-cyber .slide canvas {
+        filter: blur(4px);
+     }
+
+     body.style-cyber .slide.active canvas {
+        filter: blur(0);
+     }
+
+
+    body.style-cyber .overlay h1,
+    body.style-cyber .overlay h2 {
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        -webkit-text-stroke: 0px; /* הסרת קו מתאר אם היה */
+        text-stroke: 0px;
+    }
+
+    body.style-cyber .icon-part::before {
+        background: rgba(255,255,255,0.3);
+    }
+
+     body.style-cyber .style-switcher button {
+        color: var(--icon-color);
+     }
+
+     body.style-cyber .modal {
+         border: none;
+     }
+
+     body.style-cyber .modal-close {
+         color: var(--icon-color);
+     }
+
+     body.style-cyber .modal-loading {
+        border-color: var(--icon-color);
+        border-top-color: transparent;
+     }
+
+
+    body.style-clean {
+      --mode-bg: #f0f0f0;
+      --icon-color: #3f51b5;
+      --overlay-text: #333;
+      --overlay-font: Arial, sans-serif;
+      border: none; /* הסרת גבול אם היה */
+       /* הסרת רקעי שקופיות ספציפיים בסגנון נקי */
+       background-image: none;
+       background-color: var(--mode-bg);
+    }
+
+    body.style-clean .slide {
+        background: rgba(255,255,255,0.5);
+        filter: blur(0); /* ללא טשטוש בסגנון נקי */
+        border: none;
+    }
+
+    body.style-clean .slide.active {
+        filter: blur(0);
+    }
+
+    body.style-clean .slide canvas {
+        filter: blur(0); /* ללא טשטוש בקנבס בסגנון נקי */
+    }
+
+    body.style-clean .slide.active canvas {
+        filter: blur(0);
+    }
+
+    body.style-clean .overlay h1,
+    body.style-clean .overlay h2 {
+        text-shadow: none;
+        -webkit-text-stroke: 0px; /* הסרת קו מתאר אם היה */
+        text-stroke: 0px;
+    }
+
+    body.style-clean .icon-part::before {
+        background: rgba(0,0,0,0.1);
+    }
+
+     body.style-clean .style-switcher button {
+        color: #333;
+     }
+
+      body.style-clean .modal {
+         border: none;
+     }
+
+     body.style-clean .modal-close {
+         color: var(--icon-color);
+     }
+
+     body.style-clean .modal-loading {
+        border-color: var(--icon-color);
+        border-top-color: transparent;
+     }
+
+
+    body.style-comic {
+      --mode-bg: #fff59d;
+      --icon-color: #ff6e40;
+      --overlay-text: #3e2723;
+      /* שינוי פונט לשכבת העל בסגנון קומיקס */
+      --overlay-font: "Bangers", cursive; /* פונט קומיקס דינמי */
+      border: 5px dashed var(--icon-color); /* גבול קומיקס */
+      /* הוספת רקע דינמי בסגנון קומיקס */
+      background-image:
+        radial-gradient(circle at 50% 120%, rgba(255, 255, 255, 0.2) 20%, rgba(0, 0, 0, 0.2) 20%, rgba(0, 0, 0, 0.2) 30%, rgba(255, 255, 255, 0.2) 30%, rgba(255, 255, 255, 0.2) 40%, rgba(0, 0, 0, 0.2) 40%, rgba(0, 0, 0, 0.2) 50%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.2) 60%, rgba(0, 0, 0, 0.2) 60%, rgba(0, 0, 0, 0.2) 70%, rgba(255, 255, 255, 0.2) 70%, rgba(255, 255, 255, 0.2) 80%, rgba(0, 0, 0, 0.2) 80%, rgba(0, 0, 0, 0.2) 90%, rgba(255, 255, 255, 0.2) 90%),
+        linear-gradient(to top, #fff59d 0%, #ffab40 100%); /* רקע גרדיאנט */
+      background-size: 125% 100%; /* התאמת גודל רקע */
+      animation: comicBackground 20s linear infinite; /* אנימציית רקע */
+    }
+
+    /* אנימציית רקע קומיקס */
+    @keyframes comicBackground {
+        0% { background-position: 0% 0%; }
+        100% { background-position: 100% 100%; }
+    }
+
+
+    body.style-comic .slide {
+        background: rgba(255,255,255,0.8);
+        border: 3px solid var(--icon-color);
+        filter: none; /* ללא טשטוש בקומיקס */
+    }
+
+    body.style-comic .slide.active {
+        filter: none;
+    }
+
+    body.style-comic .slide canvas {
+        filter: none; /* ללא טשטוש בקנבס בקומיקס */
+    }
+
+    body.style-comic .slide.active canvas {
+        filter: none;
+    }
+
+    body.style-comic .overlay h1,
+    body.style-comic .overlay h2 {
+        text-shadow: 2px 2px 0px var(--mode-bg); /* צל טקסט קומיקס */
+        -webkit-text-stroke: 1px var(--icon-color); /* קו מתאר קומיקס */
+        text-stroke: 1px var(--icon-color);
+        /* שינוי פונט לכותרות בסגנון קומיקס */
+        font-family: "Luckiest Guy", cursive; /* פונט קומיקס דינמי אחר */
+    }
+
+    body.style-comic .icon-part::before {
+        background: rgba(0,0,0,0.2);
+    }
+
+     body.style-comic .style-switcher button {
+        color: #3e2723;
+     }
+
+     body.style-comic .modal {
+         border: 5px dashed var(--icon-color);
+         /* הסרת ריפוד מהמודאל עצמו בסגנון קומיקס אם הוא מפריע לגבול */
+         padding: 0;
+     }
+
+      body.style-comic .modal-content {
+         /* הוספת ריפוד לתוכן המודאל בסגנון קומיקס */
+         padding: 10px;
+         background-color: rgba(255, 255, 255, 0.9); /* רקע בהיר יותר לתוכן בקומיקס */
+         border: 3px solid var(--icon-color); /* גבול לתוכן */
+      }
+
+     body.style-comic .modal-close {
+         color: #3e2723;
+     }
+
+     body.style-comic .modal-loading {
+        border-color: #3e2723;
+        border-top-color: transparent;
+     }
+
+
+  </style>
+</head>
+<body>
+  <div class="style-switcher">
+    <button data-style="default" class="active" aria-label="סגנון ברירת מחדל">●</button> <button data-style="cyber" aria-label="סגנון סייבר">●</button>
+    <button data-style="clean" aria-label="סגנון נקי">■</button>
+    <button data-style="comic" aria-label="סגנון קומיקס">▲</button>
+  </div>
+
+  <div class="scene">
+    <div class="slides">
+      <section class="slide active" data-shape="circle" data-particle="circle" aria-label="Oren Gamchi - מעצב דיגיטלי">
+        <canvas></canvas>
+        <div class="overlay">
+          <h1>Oren_Gamchi</h1>
+          <h2>digital designer</h2>
+        </div>
+        <div class="icon-container">
+          <div class="icon-construction">
+            <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0; --scatter-x: -100px; --scatter-y: -80px; --scatter-z: -500px; --rotateY-start: 0deg; --rotateZ-start: 0deg;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee; --scatter-x: 120px; --scatter-y: -60px; --scatter-z: -600px; --rotateY-start: 90deg; --rotateZ-start: 45deg;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844; --scatter-x: -90px; --scatter-y: 110px; --scatter-z: -700px; --rotateY-start: 180deg; --rotateZ-start: -90deg;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-circle" role="dialog" aria-labelledby="modal-circle-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-circle-title" style="display: none;">Oren Gamchi - Digital Designer</h2>
+            <div class="modal-loading"></div>
+            <iframe class="modal-iframe" src="https://raw.githack.com/orengamchi/main/refs/heads/main/gemini_wow.html" title="Gemini Particle Animation" aria-label="אנימציית חלקיקים דינמית"></iframe>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="square" data-particle="square" aria-label="CLAYtronixX - AIsland">
+        <canvas></canvas>
+        <div class="overlay">
+          <h1>CLAYtronixX</h1>
+          <h2>AIsland</h2>
+        </div>
+        <div class="icon-container">
+          <div class="icon-construction">
+             <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0; --scatter-x: -100px; --scatter-y: -80px; --scatter-z: -500px; --rotateY-start: 0deg; --rotateZ-start: 0deg;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee; --scatter-x: 120px; --scatter-y: -60px; --scatter-z: -600px; --rotateY-start: 90deg; --rotateZ-start: 45deg;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844; --scatter-x: -90px; --scatter-y: 110px; --scatter-z: -700px; --rotateY-start: 180deg; --rotateZ-start: -90deg;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-square" role="dialog" aria-labelledby="modal-square-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-square-title">CLAYtronixX - AIsland</h2>
+             <div class="modal-loading"></div>
+            <iframe class="modal-iframe" src="https://raw.githack.com/orengamchi/mysite/refs/heads/main/dna.html" title="AILAND Content" aria-label="תוכן AILAND"></iframe>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="triangle" data-particle="triangle" aria-label="TRAIN_dev - מעצב דיגיטלי">
+        <canvas></canvas>
+        <div class="overlay">
+          <h1>TRAIN_dev</h1>
+          <h2>Digital Designer</h2>
+        </div>
+        <div class="icon-container">
+          <div class="icon-construction">
+             <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0; --scatter-x: -100px; --scatter-y: -80px; --scatter-z: -500px; --rotateY-start: 0deg; --rotateZ-start: 0deg;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee; --scatter-x: 120px; --scatter-y: -60px; --scatter-z: -600px; --rotateY-start: 90deg; --rotateZ-start: 45deg;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844; --scatter-x: -90px; --scatter-y: 110px; --scatter-z: -700px; --rotateY-start: 180deg; --rotateZ-start: -90deg;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-triangle" role="dialog" aria-labelledby="modal-triangle-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-triangle-title">TRAIN_dev - Digital Designer</h2>
+             <div class="modal-loading"></div>
+            <iframe class="modal-iframe" src="https://raw.githack.com/orengamchi/mysite/refs/heads/main/globe_gallery.html" title="TRAIN_DEV Content" aria-label="תוכן TRAIN_DEV"></iframe>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="hexagon" data-particle="hexagon" aria-label="דוגמנות תלת-ממד - אמנות פוליגונלית">
+        <canvas></canvas>
+        <div class="overlay">
+          <h1>3D Modeling</h1>
+          <h2>Polygonal Art</h2>
+        </div>
+        <div class="icon-container">
+          <div class="icon-construction">
+             <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0; --scatter-x: -100px; --scatter-y: -80px; --scatter-z: -500px; --rotateY-start: 0deg; --rotateZ-start: 0deg;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee; --scatter-x: 120px; --scatter-y: -60px; --scatter-z: -600px; --rotateY-start: 90deg; --rotateZ-start: 45deg;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844; --scatter-x: -90px; --scatter-y: 110px; --scatter-z: -700px; --rotateY-start: 180deg; --rotateZ-start: -90deg;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-hexagon" role="dialog" aria-labelledby="modal-hexagon-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-hexagon-title">3D Modeling - Polygonal Art</h2>
+             <p>Content for 3D Modeling - Polygonal Art modal.</p>
+            <div id="links-hexagon"></div>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="star" data-particle="star" aria-label="עיצוב ממשק משתמש - פתרונות יצירתיים">
+        <canvas></canvas>
+        <div class="overlay">
+          <h1>UI/UX Design</h1>
+          <h2>Creative Solutions</h2>
+        </div>
+        <div class="icon-container">
+          <div class="icon-construction">
+             <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0; --scatter-x: -100px; --scatter-y: -80px; --scatter-z: -500px; --rotateY-start: 0deg; --rotateZ-start: 0deg;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee; --scatter-x: 120px; --scatter-y: -60px; --scatter-z: -600px; --rotateY-start: 90deg; --rotateZ-start: 45deg;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844; --scatter-x: -90px; --scatter-y: 110px; --scatter-z: -700px; --rotateY-start: 180deg; --rotateZ-start: -90deg;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-star" role="dialog" aria-labelledby="modal-star-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-star-title">UI/UX Design - Creative Solutions</h2>
+             <div class="modal-loading"></div>
+            <iframe class="modal-iframe" src="https://raw.githack.com/orengamchi/mysite/refs/heads/main/news_4_windows_v13_deep.html" title="UI/UX Design Content" aria-label="תוכן עיצוב ממשק משתמש"></iframe>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="diamond" data-particle="diamond" aria-label="גרפיקה בתנועה - ויזואליות דינמית">
+        <canvas></canvas>
+        <div class="overlay">
+          <h1>Motion Graphics</h1>
+          <h2>Dynamic Visuals</h2>
+        </div>
+        <div class="icon-container">
+          <div class="icon-construction">
+             <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0; --scatter-x: -100px; --scatter-y: -80px; --scatter-z: -500px; --rotateY-start: 0deg; --rotateZ-start: 0deg;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee; --scatter-x: 120px; --scatter-y: -60px; --scatter-z: -600px; --rotateY-start: 90deg; --rotateZ-start: 45deg;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844; --scatter-x: -90px; --scatter-y: 110px; --scatter-z: -700px; --rotateY-start: 180deg; --rotateZ-start: -90deg;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-diamond" role="dialog" aria-labelledby="modal-diamond-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-diamond-title" style="display: none;">Motion Graphics - Dynamic Visuals</h2>
+             <style>
+                /* סגנונות ספציפיים ל-mousqito_cam_v2 בתוך מודאל Motion Graphics */
+                /* וידאו וקנבס מכסים את כל המכל במודאל */
+                #modal-diamond .modal-content video,
+                #modal-diamond .modal-content canvas#overlay {
+                    position: absolute; /* מיקום אבסולוטי בתוך modal-content */
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover; /* כיסוי מלא של המכל */
+                    z-index: 2; /* Ensure overlay is above video */
+                }
+
+                /* סגנון תיבת הודעה פשוט במקום alert, ממוקם בתוך המודאל */
+                #modal-diamond .modal-content #messageBox {
+                    position: absolute; /* מיקום אבסולוטי בתוך modal-content */
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background-color: rgba(0, 0, 0, 0.7);
+                    color: white;
+                    padding: 15px;
+                    border-radius: 8px;
+                    z-index: 10;
+                    display: none; /* מוסתר כברירת מחדל */
+                    text-align: center;
+                    font-family: Arial, sans-serif; /* פונט ברירת מחדל להודעה */
+                }
+
+                 /* הסתרת סמן העכבר במכשירי מגע בתוך המודאל */
+                @media (hover: none) {
+                    #modal-diamond .modal-content canvas#overlay {
+                        cursor: none;
+                    }
+                }
+             </style>
+
+             <video id="video" autoplay playsinline muted></video>
+             <canvas id="overlay"></canvas>
+             <div id="messageBox"></div>
+
+             <script>
+                 /* הגדרות */
+                 const REGION_diamond_script = 7; // גודל אזור לזיהוי תנועה (פיקסלים)
+                 const THR_diamond_script = 20; // סף הבדל לזיהוי תנועה
+                 const FRAME_MS_diamond_script = 120; // מרווח מינימלי בין סריקות (מילישניות)
+
+                 const TRACK_LIFE_diamond_script = 2000; // זמן חיים של נקודת מעקב (מילישניות)
+                 const PARTS_diamond_script = 16; // מספר חלקיקים שנוצרים מכל נקודת מעקב
+                 const PART_R_diamond_script = 2; // רדיוס חלקיק
+                 const PARTICLE_LIFE_diamond_script = 2000; // זמן חיים של חלקיק (מילישניות)
+
+                 /* אלמנטים מה-DOM - יש לקבל אותם בתוך המודאל */
+                 const video_diamond_script = document.querySelector('#modal-diamond video');
+                 const overlay_diamond_script = document.querySelector('#modal-diamond canvas#overlay');
+                 const ctx_diamond_script = overlay_diamond_script ? overlay_diamond_script.getContext('2d') : null;
+                 const off_diamond_script = document.createElement('canvas');
+                 const ofctx_diamond_script = off_diamond_script.getContext('2d');
+                 const messageBox_diamond_script = document.querySelector('#modal-diamond #messageBox');
+
+                 /* מצב האפליקציה */
+                 let prev_diamond_script = null;
+                 let last_diamond_script = performance.now();
+                 let lastScan_diamond_script = 0;
+
+                 const tracks_diamond_script = [];
+                 const particles_diamond_script = [];
+
+                 let center_diamond_script = { x: 0, y: 0 };
+                 let tapT_diamond_script = 0;
+                 let tapX_diamond_script = 0, tapY_diamond_script = 0;
+                 let drag_diamond_script = null;
+                 let dx_diamond_script = 0, dy_diamond_script = 0;
+
+                 let fsRequested_diamond_script = false;
+
+                 let cameraStream_diamond_script = null;
+                 let diamondAnimationFrameId_script = null; 
+
+                 /* פונקציה להצגת הודעה למשתמש */
+                 function showMessage_diamond_script(message) {
+                     if (messageBox_diamond_script) {
+                         messageBox_diamond_script.textContent = message;
+                         messageBox_diamond_script.style.display = 'block';
+                         setTimeout(() => {
+                             if (messageBox_diamond_script) messageBox_diamond_script.style.display = 'none';
+                         }, 5000);
+                     }
+                 }
+
+                 /* אתחול מצלמה */
+                 async function initCamera_diamond_script() {
+                     if(cameraStream_diamond_script) {
+                         cameraStream_diamond_script.getTracks().forEach(t=>t.stop());
+                         cameraStream_diamond_script = null;
+                     }
+                     if (ctx_diamond_script && overlay_diamond_script) {
+                         ctx_diamond_script.clearRect(0, 0, overlay_diamond_script.width, overlay_diamond_script.height);
+                     }
+                      tracks_diamond_script.length = 0;
+                      particles_diamond_script.length = 0;
+                      prev_diamond_script = null;
+
+                     try {
+                         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                         cameraStream_diamond_script = stream;
+                         if (video_diamond_script) video_diamond_script.srcObject = stream;
+
+                         if (video_diamond_script) {
+                             video_diamond_script.onloadedmetadata = () => {
+                                 if (video_diamond_script) video_diamond_script.play();
+                                 resize_diamond_script();
+                                 diamondAnimationFrameId_script = requestAnimationFrame(loop_diamond_script);
+                             };
+                             video_diamond_script.onerror = (e) => {
+                                  console.error("Video element error:", e);
+                                  showMessage_diamond_script('שגיאה בהפעלת וידאו המצלמה.');
+                              };
+                         }
+
+                     } catch (e) {
+                         console.error('Error accessing camera:', e);
+                         if (e.name === 'NotAllowedError') {
+                              showMessage_diamond_script('הגישה למצלמה נדחתה. אנא אפשר גישה למצלמה בהגדרות הדפדפן.');
+                         } else {
+                              showMessage_diamond_script('שגיאה בגישה למצלמה: ' + e.name);
+                         }
+                     }
+                 }
+
+                 /* פונקציה לעצירת זרם המצלמה ולולאת האנימציה */
+                 function stopCamera_diamond_script() {
+                     if (cameraStream_diamond_script) {
+                         cameraStream_diamond_script.getTracks().forEach(track => track.stop());
+                         cameraStream_diamond_script = null;
+                     }
+                     if (diamondAnimationFrameId_script) {
+                         cancelAnimationFrame(diamondAnimationFrameId_script);
+                         diamondAnimationFrameId_script = null;
+                     }
+                     if (ctx_diamond_script && overlay_diamond_script) {
+                         ctx_diamond_script.clearRect(0, 0, overlay_diamond_script.width, overlay_diamond_script.height);
+                     }
+                      tracks_diamond_script.length = 0;
+                      particles_diamond_script.length = 0;
+                      prev_diamond_script = null;
+                 }
+
+
+                 /* שינוי גודל הקנבס בהתאם לגודל הוידאו או החלון */
+                 function resize_diamond_script() {
+                     if (!overlay_diamond_script || !video_diamond_script) return;
+                     const container = overlay_diamond_script.parentElement;
+                     overlay_diamond_script.width = container.offsetWidth;
+                     overlay_diamond_script.height = container.offsetHeight;
+                     off_diamond_script.width = overlay_diamond_script.width / 4;
+                     off_diamond_script.height = overlay_diamond_script.height / 4;
+                     center_diamond_script = { x: overlay_diamond_script.width / 2, y: overlay_diamond_script.height / 2 };
+                 }
+                 window.addEventListener('resize', resize_diamond_script);
+
+
+                 /* אינטראקציית עכבר/מגע על שכבת העל */
+                 if (overlay_diamond_script) {
+                     overlay_diamond_script.addEventListener('mousedown', e => {
+                         const { x, y } = toCanvas_diamond_script(e);
+                         const now = performance.now();
+                         if (now - tapT_diamond_script < 300 && Math.hypot(x - tapX_diamond_script, y - tapY_diamond_script) < 20) {
+                             freezeParticle_diamond_script(x, y);
+                             tapT_diamond_script = 0;
+                         } else {
+                             tapT_diamond_script = now;
+                             tapX_diamond_script = x;
+                             tapY_diamond_script = y;
+                             drag_diamond_script = particles_diamond_script.find(p => p.persistent && Math.hypot(p.x - x, p.y - y) < 15);
+                             if (drag_diamond_script) {
+                                 dx_diamond_script = x - drag_diamond_script.x;
+                                 dy_diamond_script = y - drag_diamond_script.y;
+                             }
+                         }
+                     });
+
+                     overlay_diamond_script.addEventListener('mousemove', e => {
+                         if (drag_diamond_script) {
+                             const { x, y } = toCanvas_diamond_script(e);
+                             drag_diamond_script.x = x - dx_diamond_script;
+                             drag_diamond_script.y = y - dy_diamond_script;
+                         }
+                     });
+                     ['mouseup', 'mouseleave'].forEach(ev => overlay_diamond_script.addEventListener(ev, () => { drag_diamond_script = null; }));
+                 }
+
+
+                 /* המרת קואורדינטות אירוע לקואורדינטות הקנבס */
+                 function toCanvas_diamond_script(e) {
+                     if (!overlay_diamond_script) return { x: 0, y: 0 };
+                     const rect = overlay_diamond_script.getBoundingClientRect();
+                     return {
+                         x: (e.clientX - rect.left) * (overlay_diamond_script.width / rect.width),
+                         y: (e.clientY - rect.top) * (overlay_diamond_script.height / rect.height)
+                     };
+                 }
+
+                 /* קיבוע חלקיק קרוב לנקודת הלחיצה */
+                 function freezeParticle_diamond_script(x, y) {
+                     for (const p of particles_diamond_script) {
+                         if (Math.hypot(p.x - x, p.y - y) < 15) {
+                             p.persistent = true;
+                             p.vx = p.vy = 0;
+                             return;
+                         }
+                     }
+                 }
+
+                 /* לולאה ראשית של האנימציה והלוגיקה */
+                 function loop_diamond_script(t) {
+                     if (video_diamond_script && video_diamond_script.readyState >= 2 && ctx_diamond_script) {
+                         if (t - lastScan_diamond_script > FRAME_MS_diamond_script) {
+                             scan_diamond_script();
+                             lastScan_diamond_script = t;
+                         }
+                         const dt = (t - last_diamond_script) / 16.67;
+                         last_diamond_script = t;
+                         updateParticles_diamond_script(dt);
+                         draw_diamond_script();
+                         clean_diamond_script();
+                     }
+                     diamondAnimationFrameId_script = requestAnimationFrame(loop_diamond_script);
+                 }
+
+                 /* זיהוי תנועה */
+                 function scan_diamond_script() {
+                     if (!off_diamond_script || !ofctx_diamond_script || !video_diamond_script || video_diamond_script.videoWidth === 0 || video_diamond_script.videoHeight === 0) return;
+                     ofctx_diamond_script.drawImage(video_diamond_script, 0, 0, off_diamond_script.width, off_diamond_script.height);
+                     const data = ofctx_diamond_script.getImageData(0, 0, off_diamond_script.width, off_diamond_script.height).data;
+
+                     if (prev_diamond_script) {
+                         const hits = [];
+                         for (let y = 0; y < off_diamond_script.height; y += REGION_diamond_script) {
+                             for (let x = 0; x < off_diamond_script.width; x += REGION_diamond_script) {
+                                 let diff = 0;
+                                 let count = 0;
+                                 for (let dy = 0; dy < REGION_diamond_script; dy += 3) {
+                                     for (let dx = 0; dx < REGION_diamond_script; dx += 3) {
+                                         const i = ((y + dy) * off_diamond_script.width + x + dx) * 4;
+                                         diff += Math.abs(data[i] - prev_diamond_script[i]) +
+                                                 Math.abs(data[i + 1] - prev_diamond_script[i + 1]) +
+                                                 Math.abs(data[i + 2] - prev_diamond_script[i + 2]);
+                                         count++;
+                                     }
+                                 }
+                                 if (diff / count > THR_diamond_script) {
+                                     const rx = (x + REGION_diamond_script / 2) * (overlay_diamond_script.width / off_diamond_script.width);
+                                     const ry = (y + REGION_diamond_script / 2) * (overlay_diamond_script.height / off_diamond_script.height);
+                                     tracks_diamond_script.push({ x: rx, y: ry, birth: Date.now() });
+                                     spawnParticles_diamond_script(rx, ry, Date.now());
+                                 }
+                             }
+                         }
+                     }
+                     prev_diamond_script = data.slice(0);
+                 }
+
+                 /* יצירת חלקיקים בנקודה מסוימת */
+                 function spawnParticles_diamond_script(x, y, birth) {
+                     for (let i = 0; i < PARTS_diamond_script; i++) {
+                         const ang = Math.random() * Math.PI * 2;
+                         const spd = 1 + Math.random() * 1.1;
+                         particles_diamond_script.push({
+                             x, y,
+                             vx: Math.cos(ang) * spd,
+                             vy: Math.sin(ang) * spd,
+                             birth,
+                             life: PARTICLE_LIFE_diamond_script,
+                             persistent: false
+                         });
+                     }
+                 }
+
+                 /* עדכון מיקומי חלקיקים */
+                 function updateParticles_diamond_script(dt) {
+                     const now = Date.now();
+                     particles_diamond_script.forEach(p => {
+                         if (!p.persistent) {
+                             p.x += p.vx * dt;
+                             p.y += p.vy * dt;
+                             p.vy += 0.02 * dt;
+                             if (p.x < PART_R_diamond_script || p.x > overlay_diamond_script.width - PART_R_diamond_script) p.vx *= -0.9;
+                             if (p.y < PART_R_diamond_script || p.y > overlay_diamond_script.height - PART_R_diamond_script) p.vy *= -0.9;
+                             p.x = Math.max(PART_R_diamond_script, Math.min(overlay_diamond_script.width - PART_R_diamond_script, p.x));
+                             p.y = Math.max(PART_R_diamond_script, Math.min(overlay_diamond_script.height - PART_R_diamond_script, p.y));
+                             p.life = PARTICLE_LIFE_diamond_script - (now - p.birth);
+                         }
+                     });
+                     for (let i = particles_diamond_script.length - 1; i >= 0; i--) {
+                         if (!particles_diamond_script[i].persistent && particles_diamond_script[i].life <= 0) {
+                             particles_diamond_script.splice(i, 1);
+                         }
+                     }
+                 }
+
+                 /* פונקציה למעבר הדרגתי בין צבעים (Linear Interpolation) */
+                 function lerp_diamond_script(r1, g1, b1, r2, g2, b2, t) {
+                     return 'rgb(' +
+                         (r1 + (r2 - r1) * t | 0) + ',' +
+                         (g1 + (g2 - g1) * t | 0) + ',' +
+                         (b1 + (b2 - b1) * t | 0) + ')';
+                 }
+
+                 /* ציור על הקנבס */
+                 function draw_diamond_script() {
+                     if (!ctx_diamond_script || !overlay_diamond_script) return;
+                     ctx_diamond_script.clearRect(0, 0, overlay_diamond_script.width, overlay_diamond_script.height);
+                     const now = Date.now();
+
+                     tracks_diamond_script.forEach(tr => {
+                         const age = now - tr.birth;
+                         const t = Math.min(age / TRACK_LIFE_diamond_script, 1);
+                         const color = lerp_diamond_script(255, 0, 40, 0, 234, 255, t);
+                         ctx_diamond_script.strokeStyle = color;
+                         ctx_diamond_script.lineWidth = 2;
+                         ctx_diamond_script.beginPath();
+                         ctx_diamond_script.arc(tr.x, tr.y, 14, 0, Math.PI * 2);
+                         ctx_diamond_script.stroke();
+                     });
+
+                     particles_diamond_script.forEach(p => {
+                         const t = Math.min((Date.now() - p.birth) / PARTICLE_LIFE_diamond_script, 1);
+                         ctx_diamond_script.fillStyle = lerp_diamond_script(255, 0, 40, 0, 234, 255, t);
+                         ctx_diamond_script.beginPath();
+                         ctx_diamond_script.arc(p.x, p.y, PART_R_diamond_script, 0, Math.PI * 2);
+                         ctx_diamond_script.fill();
+                     });
+                 }
+
+                 /* ניקוי נקודות מעקב וחלקיקים ישנים */
+                 function clean_diamond_script() {
+                     const now = Date.now();
+                     for (let i = tracks_diamond_script.length - 1; i >= 0; i--) {
+                         if (now - tracks_diamond_script[i].birth > TRACK_LIFE_diamond_script) tracks_diamond_script.splice(i, 1);
+                     }
+                 }
+
+                 const modalContentElement_diamond_script = document.querySelector('#modal-diamond .modal-content');
+                 if (modalContentElement_diamond_script) {
+                     modalContentElement_diamond_script.parentElement.addEventListener('modalOpen', () => {
+                         initCamera_diamond_script();
+                     });
+
+                     modalContentElement_diamond_script.parentElement.addEventListener('modalClose', () => {
+                         stopCamera_diamond_script();
+                     });
+                 }
+             </script>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="line" data-particle="line" aria-label="פיתוח אתרים - חוויות אינטראקטיביות">
+        <canvas></canvas>
+        <div class="overlay">
+          <h1>Web Development</h1>
+          <h2>Interactive Experiences</h2>
+        </div>
+        <div class="icon-container">
+          <div class="icon-construction">
+             <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0; --scatter-x: -100px; --scatter-y: -80px; --scatter-z: -500px; --rotateY-start: 0deg; --rotateZ-start: 0deg;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee; --scatter-x: 120px; --scatter-y: -60px; --scatter-z: -600px; --rotateY-start: 90deg; --rotateZ-start: 45deg;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844; --scatter-x: -90px; --scatter-y: 110px; --scatter-z: -700px; --rotateY-start: 180deg; --rotateZ-start: -90deg;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-line" role="dialog" aria-labelledby="modal-line-title">
+           <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-line-title" style="display:none;">Web Development - Interactive Experiences</h2>
+            <div class="modal-loading"></div>
+            <iframe class="modal-iframe" src="https://raw.githack.com/orengamchi/mysite/refs/heads/main/camera_tracker.html" title="Web Development Content - Camera Tracker" aria-label="תוכן פיתוח אתרים - מעקב מצלמה"></iframe>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="cross" data-particle="cross" aria-label="זהות מותג - מערכות ויזואליות">
+        <canvas></canvas>
+        <div class="overlay">
+          <h1>Brand Identity</h1>
+          <h2>Visual Systems</h2>
+        </div>
+        <div class="icon-container">
+          <div class="icon-construction">
+             <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0; --scatter-x: -100px; --scatter-y: -80px; --scatter-z: -500px; --rotateY-start: 0deg; --rotateZ-start: 0deg;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee; --scatter-x: 120px; --scatter-y: -60px; --scatter-z: -600px; --rotateY-start: 90deg; --rotateZ-start: 45deg;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844; --scatter-x: -90px; --scatter-y: 110px; --scatter-z: -700px; --rotateY-start: 180deg; --rotateZ-start: -90deg;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-cross" role="dialog" aria-labelledby="modal-cross-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-cross-title">Brand Identity - Visual Systems</h2>
+            <video controls loop autoplay playsinline>
+                <source src="https://raw.githubusercontent.com/orengamchi/mysite/main/20250308_0231_Loop%20Video_loop_01jnsjmrnfenv9hr18szknwsyq.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="spiral" data-particle="spiral" aria-label="קידוד יצירתי - אמנות גנרטיבית">
+        <canvas></canvas>
+        <div class="overlay">
+          <h1>Creative Coding</h1>
+          <h2>Generative Art</h2>
+        </div>
+        <div class="icon-container">
+          <div class="icon-construction">
+             <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0; --scatter-x: -100px; --scatter-y: -80px; --scatter-z: -500px; --rotateY-start: 0deg; --rotateZ-start: 0deg;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee; --scatter-x: 120px; --scatter-y: -60px; --scatter-z: -600px; --rotateY-start: 90deg; --rotateZ-start: 45deg;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844; --scatter-x: -90px; --scatter-y: 110px; --scatter-z: -700px; --rotateY-start: 180deg; --rotateZ-start: -90deg;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-spiral" role="dialog" aria-labelledby="modal-spiral-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-spiral-title">Creative Coding - Generative Art</h2>
+             <div class="modal-loading"></div>
+            <iframe class="modal-iframe" src="https://raw.githack.com/orengamchi/mysite/refs/heads/main/oren_wb_master.html" title="Creative Coding Content" aria-label="תוכן קידוד יצירתי"></iframe>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="wave" data-particle="wave" aria-label="טיפוגרפיה - אמנות אותיות">
+        <canvas></canvas>
+        <div class="overlay">
+          <h1>Typography</h1>
+          <h2>Letterform Art</h2>
+        </div>
+        <div class="icon-container">
+          <div class="icon-construction">
+             <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0; --scatter-x: -100px; --scatter-y: -80px; --scatter-z: -500px; --rotateY-start: 0deg; --rotateZ-start: 0deg;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee; --scatter-x: 120px; --scatter-y: -60px; --scatter-z: -600px; --rotateY-start: 90deg; --rotateZ-start: 45deg;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844; --scatter-x: -90px; --scatter-y: 110px; --scatter-z: -700px; --rotateY-start: 180deg; --rotateZ-start: -90deg;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-wave" role="dialog" aria-labelledby="modal-wave-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-wave-title">Typography - Letterform Art</h2>
+             <p>Content for Typography - Letterform Art modal.</p>
+            <div id="links-wave"></div>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="grid" data-particle="grid" aria-label="אמנות דיגיטלית - פיקסל מושלם">
+        <canvas></canvas>
+        <div class="overlay">
+          <h1>Digital Art</h1>
+          <h2>Pixel Perfect</h2>
+        </div>
+        <div class="icon-container">
+          <div class="icon-construction">
+             <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0; --scatter-x: -100px; --scatter-y: -80px; --scatter-z: -500px; --rotateY-start: 0deg; --rotateZ-start: 0deg;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee; --scatter-x: 120px; --scatter-y: -60px; --scatter-z: -600px; --rotateY-start: 90deg; --rotateZ-start: 45deg;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844; --scatter-x: -90px; --scatter-y: 110px; --scatter-z: -700px; --rotateY-start: 180deg; --rotateZ-start: -90deg;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-grid" role="dialog" aria-labelledby="modal-grid-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-grid-title">Digital Art - Pixel Perfect</h2>
+             <div class="modal-loading"></div>
+            <iframe class="modal-iframe" src="https://raw.githack.com/orengamchi/mysite/refs/heads/main/spacetime_v4.html" title="Digital Art Content" aria-label="תוכן אמנות דיגיטלית"></iframe>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-shape="bubbles" data-particle="bubbles" aria-label="אילוסטרציה - סיפור ויזואלי">
+        <canvas></canvas>
+        <div class="overlay">
+          <h1>Illustration</h1>
+          <h2>Visual Storytelling</h2>
+        </div>
+        <div class="icon-container">
+          <div class="icon-construction">
+             <div class="icon-part" style="width: 120px; height: 120px; top: 0; left: 0; --scatter-x: -100px; --scatter-y: -80px; --scatter-z: -500px; --rotateY-start: 0deg; --rotateZ-start: 0deg;"></div>
+            <div class="icon-part" style="width: 80px; height: 80px; top: 20px; left: 20px; background: #22d1ee; --scatter-x: 120px; --scatter-y: -60px; --scatter-z: -600px; --rotateY-start: 90deg; --rotateZ-start: 45deg;"></div>
+            <div class="icon-part" style="width: 40px; height: 40px; top: 40px; left: 40px; background: #f7d844; --scatter-x: -90px; --scatter-y: 110px; --scatter-z: -700px; --rotateY-start: 180deg; --rotateZ-start: -90deg;"></div>
+          </div>
+        </div>
+        <div class="modal" id="modal-bubbles" role="dialog" aria-labelledby="modal-bubbles-title">
+          <button class="modal-close" aria-label="סגור חלונית">✖</button>
+          <div class="modal-content">
+            <h2 id="modal-bubbles-title" style="display:none;">Illustration - Visual Storytelling</h2>
+            <div class="modal-loading"></div>
+            <iframe class="modal-iframe" src="https://raw.githack.com/orengamchi/mysite/refs/heads/main/mousqito_cam_v2.html" title="Illustration Content - Mousqito Cam" aria-label="תוכן אילוסטרציה - מצלמת יתוש"></iframe>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="mobile-controls">
+    <div class="mobile-btn" id="prev-btn" aria-label="שקופית קודמת">↑</div>
+    <div class="mobile-btn" id="next-btn" aria-label="שקופית הבאה">↓</div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const slides = [...document.querySelectorAll('.slide')]; // קבלת כל השקופיות
+      const container = document.querySelector('.slides'); // מכל השקופיות
+      const prevBtn = document.getElementById('prev-btn'); // כפתור קודם למובייל
+      const nextBtn = document.getElementById('next-btn'); // כפתור הבא למובייל
+      const styleSwitcher = document.querySelector('.style-switcher'); // מחליף סגנונות
+      const styleButtons = styleSwitcher.querySelectorAll('button'); // כפתורי סגנון
+      const body = document.body; // אלמנט גוף הדף
+
+      let current = 0; // אינדקס השקופית הנוכחית
+      let wheelDelta = 0; // דלתא גלילה
+      // חישוב עומק בהתבסס על גובה אזור התצוגה, מוגבל בין 600 ל-1000
+      let depth = Math.min(Math.max(window.innerHeight * 0.8, 600), 1000);
+      let systems = []; // מערך להחזקת מופעי מערכות חלקיקים
+      let lastTap = 0; // זמן לחיצה אחרונה (לזיהוי לחיצה כפולה)
+      let isAnimating = false; // דגל למניעת הפעלת אנימציה מהירה
+      // קבלת משך אנימציית מעבר של האייקון מ-CSS
+      // יש לוודא שלפחות אלמנט icon-part אחד קיים לפני קבלת הסגנון
+      const iconAnimationDuration = document.querySelector('.icon-part')
+        ? parseFloat(getComputedStyle(document.querySelector('.icon-part')).animationDuration) * 1000
+        : 2500; // ברירת מחדל אם לא נמצא אלמנט
+
+      let lastWheelTime = 0; // זמן אירוע גלילה אחרון
+      const wheelThrottle = 500; // הגבלת קצב אירועי גלילה
+      let lastIconTap = 0; // זמן לחיצה אחרונה על אייקון
+      const iconTapThrottle = 300; // הגבלת קצב לחיצות על אייקונים
+
+      // צבעים לרקע הדינמי לפי אינדקס שקופית
+      const slideColors = [
+          'rgba(74, 35, 90, 0.8)',   // 1: #4a235a (Purple) - 80% opacity for particles
+          'rgba(31, 97, 141, 0.8)',  // 2: #1f618d (Blue) - 80% opacity
+          'rgba(26, 188, 156, 0.8)', // 3: #1abc9c (Teal) - 80% opacity
+          'rgba(241, 196, 15, 0.8)', // 4: #f1c40f (Yellow) - 80% opacity
+          'rgba(230, 126, 34, 0.8)', // 5: #e67e22 (Orange) - 80% opacity
+          'rgba(231, 76, 60, 0.8)',  // 6: #e74c3c (Red) - 80% opacity
+          'rgba(155, 89, 182, 0.8)', // 7: #9b59b6 (Amethyst) - 80% opacity
+          'rgba(52, 73, 94, 0.8)',   // 8: #34495e (Wet Asphalt) - 80% opacity
+          'rgba(192, 57, 43, 0.8)',  // 9: #c0392b (Alizarin) - 80% opacity
+          'rgba(39, 174, 96, 0.8)',  // 10: #27ae60 (Emerald) - 80% opacity
+          'rgba(41, 128, 185, 0.8)', // 11: #2980b9 (Peter River) - 80% opacity
+          'rgba(142, 68, 173, 0.8)'  // 12: #8e44ad (Wisteria) - 80% opacity
+      ];
+
+       const comicSlideColors = [
+          'rgba(156, 39, 176, 0.6)', // 1: Purple
+          'rgba(33, 150, 243, 0.6)', // 2: Blue
+          'rgba(76, 175, 80, 0.6)', // 3: Green
+          'rgba(255, 193, 7, 0.6)', // 4: Yellow
+          'rgba(255, 87, 34, 0.6)', // 5: Orange
+          'rgba(244, 67, 54, 0.6)', // 6: Red
+          'rgba(103, 58, 183, 0.6)', // 7: Deep Purple
+          'rgba(96, 125, 139, 0.6)', // 8: Blue Grey
+          'rgba(183, 28, 28, 0.6)', // 9: Dark Red
+          'rgba(139, 195, 74, 0.6)', // 10: Light Green
+          'rgba(3, 169, 244, 0.6)', // 11: Light Blue
+          'rgba(156, 39, 176, 0.6)'  // 12: Purple (repeat)
+      ];
+
+
+      // פונקציית Easing (מתוך ה-CSS)
+      function easeOutQuart(t) {
+        return 1 - Math.pow(1 - t, 4);
+      }
+
+      // מחלקת מערכת חלקיקים (יישום בסיסי)
+      class ParticleSystem {
+        constructor(canvas, shape, particleColor) {
+          this.canvas = canvas;
+          this.ctx = canvas ? canvas.getContext('2d') : null;
+          this.shape = shape;
+          this.particleColor = particleColor; // צבע החלקיקים
+          this.particles = [];
+          this.width = canvas ? canvas.width : 0;
+          this.height = canvas ? canvas.height : 0;
+          this.isAnimating = false; // דגל לשליטה בלולאת האנימציה
+
+          if (canvas) {
+              this.initParticles(); // אתחול חלקיקים
+              this.resizeCanvas(); // קביעת גודל קנבס התחלתי
+              window.addEventListener('resize', this.resizeCanvas.bind(this)); // האזנה לשינוי גודל
+          }
+        }
+
+        // אתחול חלקיקים בהתבסס על צורה
+        initParticles() {
+          if (!this.canvas) return;
+          this.particles = [];
+          // התאמת מספר החלקיקים לגודל, מוגבל ל-150
+          const numParticles = Math.min(this.width * this.height / 10000, 150);
+          for (let i = 0; i < numParticles; i++) {
+            this.particles.push(this.createParticle());
+          }
+        }
+
+        // יצירת חלקיק בודד
+        createParticle() {
+          let x, y;
+          // פיזור חלקיקים שונה בהתבסס על צורה (דוגמה בסיסית)
+          switch (this.shape) {
+            case 'circle':
+              const angle = Math.random() * Math.PI * 2;
+              const radius = Math.random() * Math.min(this.width, this.height) / 3;
+              x = this.width / 2 + Math.cos(angle) * radius;
+              y = this.height / 2 + Math.sin(angle) * radius;
+              break;
+            case 'square':
+              x = Math.random() * this.width;
+              y = Math.random() * this.height;
+              break;
+            case 'triangle':
+              // פיזור משולש פשוט
+              x = Math.random() * this.width;
+              y = Math.random() * this.height;
+              if (y > this.height - (x * this.height / this.width)) {
+                  y = this.height - (x * this.height / this.width) * Math.random();
+              }
+              break;
+             case 'hexagon':
+                // פיזור אקראי פשוט למשושה
+                x = Math.random() * this.width;
+                y = Math.random() * this.height;
+                break;
+             case 'star':
+                // פיזור אקראי פשוט לכוכב
+                x = Math.random() * this.width;
+                y = Math.random() * this.height;
+                break;
+             case 'diamond':
+                // פיזור אקראי פשוט ליהלום
+                x = Math.random() * this.width;
+                y = Math.random() * this.height;
+                break;
+             case 'line':
+                // חלקיקים לאורך קו
+                x = Math.random() * this.width;
+                y = this.height / 2 + (Math.random() - 0.5) * 20; // פס אופקי דק
+                break;
+             case 'cross':
+                // חלקיקים לאורך צורת צלב
+                if (Math.random() > 0.5) { // חלק אופקי
+                    x = Math.random() * this.width;
+                    y = this.height / 2 + (Math.random() - 0.5) * 20;
+                } else { // חלק אנכי
+                    x = this.width / 2 + (Math.random() - 0.5) * 20;
+                    y = Math.random() * this.height;
+                }
+                break;
+             case 'spiral':
+                // חלקיקים בתבנית ספירלה (מפושט)
+                const spiralRadius = Math.random() * Math.min(this.width, this.height) / 2;
+                const spiralAngle = Math.random() * Math.PI * 10; // מספר סיבובים
+                x = this.width / 2 + Math.cos(spiralAngle) * spiralRadius;
+                y = this.height / 2 + Math.sin(spiralAngle) * spiralRadius;
+                break;
+             case 'wave':
+                // חלקיקים עוקבים אחר תבנית גל (מפושט)
+                x = Math.random() * this.width;
+                y = this.height / 2 + Math.sin(x / 50) * 30 + (Math.random() - 0.5) * 20;
+                break;
+             case 'grid':
+                // חלקיקים על רשת (מפושט)
+                const gridSize = 40;
+                x = Math.floor(Math.random() * (this.width / gridSize)) * gridSize + gridSize / 2;
+                y = Math.floor(Math.random() * (this.height / gridSize)) * gridSize + gridSize / 2;
+                break;
+             case 'bubbles':
+                 // חלקיקים מפוזרים אקראית כמו בועות
+                 x = Math.random() * this.width;
+                 y = Math.random() * this.height;
+                 break;
+            default: // ברירת מחדל - פיזור אקראי
+              x = Math.random() * this.width;
+              y = Math.random() * this.height;
+          }
+
+          return {
+            x: x,
+            y: y,
+            size: Math.random() * 2 + 1, // גודל חלקיק
+            speedX: (Math.random() - 0.5) * 0.5, // מהירות אופקית אקראית
+            speedY: (Math.random() - 0.5) * 0.5, // מהירות אנכית אקראית
+            opacity: Math.random() * 0.5 + 0.2, // שקיפות התחלתית אקראית
+            color: this.particleColor, // שימוש בצבע שהועבר למערכת
+            // נוספו מאפיינים לתנועה דינמית יותר
+            angle: Math.random() * Math.PI * 2,
+            velocity: Math.random() * 0.5 + 0.1,
+            angularVelocity: (Math.random() - 0.5) * 0.01
+          };
+        }
+
+        // עדכון מיקום ומאפייני חלקיק
+        updateParticle(particle) {
+           // הגדלת מהירות ב-10%
+           const speedMultiplier = 1.1; // 10% יותר מהירות
+           particle.x += Math.cos(particle.angle) * particle.velocity * speedMultiplier;
+           particle.y += Math.sin(particle.angle) * particle.velocity * speedMultiplier;
+
+           // עדכון זווית בהתבסס על מהירות זוויתית
+           particle.angle += particle.angularVelocity;
+
+           // הוספת אקראיות מסוימת למהירות ולמהירות הזוויתית לאורך זמן
+           particle.velocity += (Math.random() - 0.5) * 0.01;
+           particle.angularVelocity += (Math.random() - 0.5) * 0.0005;
+
+           // הגבלת מהירות ומהירות זוויתית
+           particle.velocity = Math.max(0.1, Math.min(particle.velocity, 1));
+           particle.angularVelocity = Math.max(-0.005, Math.min(particle.angularVelocity, 0.005));
+
+
+          // עטיפת חלקיקים מסביב לקצוות
+          if (particle.x > this.width) particle.x = 0;
+          if (particle.x < 0) particle.x = this.width;
+          if (particle.y > this.height) particle.y = 0;
+          if (particle.y < 0) particle.y = this.height;
+
+          // אופציונלי: הוספת תנועה אקראית או פעימה
+          particle.opacity = Math.sin(Date.now() * 0.001 + particle.x + particle.y) * 0.3 + 0.5;
+        }
+
+        // ציור חלקיק בודד
+        drawParticle(particle) {
+          if (!this.ctx) return;
+          this.ctx.fillStyle = particle.color; // שימוש בצבע שהועבר
+          this.ctx.beginPath();
+
+          // ציור צורה לפי this.shape
+          const r = particle.size * 3; // גודל החלקיק
+          const x = particle.x;
+          const y = particle.y;
+
+          switch(this.shape) {
+              case 'circle':
+                  this.ctx.arc(x, y, r, 0, Math.PI * 2);
+                  break;
+              case 'square':
+                  this.ctx.rect(x - r / 2, y - r / 2, r, r);
+                  break;
+              case 'triangle':
+                  // ציור משולש פשוט
+                  this.ctx.moveTo(x, y - r);
+                  this.ctx.lineTo(x + r * Math.cos(Math.PI/6), y + r * Math.sin(Math.PI/6));
+                  this.ctx.lineTo(x - r * Math.cos(Math.PI/6), y + r * Math.sin(Math.PI/6));
+                  this.ctx.closePath();
+                  break;
+              case 'hexagon':
+                   // ציור משושה פשוט
+                   for (let i = 0; i < 6; i++) {
+                       const angle = i * Math.PI / 3;
+                       const px = x + Math.cos(angle) * r;
+                       const py = y + Math.sin(angle) * r;
+                       if (i === 0) this.ctx.moveTo(px, py);
+                       else this.ctx.lineTo(px, py);
+                   }
+                   this.ctx.closePath();
+                   break;
+              case 'star':
+                  // ציור כוכב פשוט (5 קודקודים)
+                  for (let i = 0; i < 5; i++) {
+                      const angle1 = i * Math.PI * 2 / 5 - Math.PI / 2;
+                      const angle2 = angle1 + Math.PI / 5;
+                      const x1 = x + Math.cos(angle1) * r;
+                      const y1 = y + Math.sin(angle1) * r;
+                      const x2 = x + Math.cos(angle2) * r / 2; // קודקוד פנימי
+                      const y2 = y + Math.sin(angle2) * r / 2;
+                      if (i === 0) this.ctx.moveTo(x1, y1);
+                      else this.ctx.lineTo(x1, y1);
+                      this.ctx.lineTo(x2, y2);
+                  }
+                  this.ctx.closePath();
+                  break;
+              case 'diamond':
+                  // ציור יהלום פשוט
+                  this.ctx.moveTo(x, y - r);
+                  this.ctx.lineTo(x + r * 0.7, y);
+                  this.ctx.lineTo(x, y + r);
+                  this.ctx.lineTo(x - r * 0.7, y);
+                  this.ctx.closePath();
+                  break;
+              case 'line':
+                   // ציור קו קצר
+                   this.ctx.moveTo(x - r, y);
+                   this.ctx.lineTo(x + r, y);
+                   this.ctx.lineWidth = particle.size; // עובי הקו
+                   this.ctx.strokeStyle = particle.color;
+                   this.ctx.stroke();
+                   return; // אין צורך למילוי קו
+              case 'cross':
+                   // ציור צלב פשוט
+                   this.ctx.moveTo(x - r, y);
+                   this.ctx.lineTo(x + r, y);
+                   this.ctx.moveTo(x, y - r);
+                   this.ctx.lineTo(x, y + r);
+                   this.ctx.lineWidth = particle.size;
+                   this.ctx.strokeStyle = particle.color;
+                   this.ctx.stroke();
+                   return; // אין צורך למילוי צלב
+               case 'grid':
+                  // ציור ריבוע קטן כחלק מרשת
+                  const smallR = r * 0.5;
+                  this.ctx.rect(x - smallR / 2, y - smallR / 2, smallR, smallR);
+                  break;
+               case 'bubbles':
+                   // ציור עיגול כמו בועה
+                   this.ctx.arc(x, y, r, 0, Math.PI * 2);
+                   break;
+              case 'wave':
+                  // ציור עיגול בתבנית גל
+                  this.ctx.arc(x, y, r, 0, Math.PI * 2);
+                  break;
+              default: // ברירת מחדל - עיגול
+                  this.ctx.arc(x, y, r, 0, Math.PI * 2);
+                  break;
+          }
+
+          this.ctx.fill(); // מילוי הצורה
+        }
+
+        // לולאת אנימציה
+        animate() {
+          if (!this.isAnimating || !this.ctx) return; // עצירה אם האנימציה לא פעילה או הקונטקסט לא קיים
+
+          this.ctx.clearRect(0, 0, this.width, this.height); // ניקוי הקנבס
+          this.particles.forEach(particle => {
+            this.updateParticle(particle);
+            this.drawParticle(particle);
+          });
+
+          requestAnimationFrame(this.animate.bind(this)); // בקשת הפריים הבא
+        }
+
+        // התחלת אנימציה
+        start() {
+            this.isAnimating = true;
+            this.animate();
+        }
+
+        // עצירת אנימציה
+        stop() {
+            this.isAnimating = false;
+        }
+
+        // שינוי גודל קנבס ואתחול מחדש של חלקיקים
+        resizeCanvas() {
+          if (!this.canvas) return;
+          this.width = this.canvas.width = this.canvas.offsetWidth;
+          this.height = this.canvas.height = this.canvas.offsetHeight;
+          this.initParticles(); // אתחול מחדש של חלקיקים בשינוי גודל
+        }
+      }
+
+      // אתחול מערכות חלקיקים עבור כל שקופית
+      slides.forEach((slide, index) => {
+        const canvas = slide.querySelector('canvas');
+        const shape = slide.dataset.particle || 'circle'; // קבלת צורת החלקיק מה-data attribute
+        // בחירת צבע מהמערךslideColors  עם שקיפות 80%
+        const particleColor = slideColors[index % slideColors.length];
+        const system = new ParticleSystem(canvas, shape, particleColor);
+        systems.push(system);
+      });
+
+      // פונקציה לעדכון מיקומי השקופיות ומצב פעיל
+      function updateSlides() {
+        const total = slides.length;
+        slides.forEach((slide, index) => {
+          const offset = index - current;
+          const angle = offset * 10; // הפרש זווית בין שקופיות
+          const translateY = offset * 0; // אין הזזה אנכית במערך זה
+          const translateZ = -Math.abs(offset) * depth; // הזזה בציר Z בהתבסס על מרחק מהשקופית הפעילה
+
+          // החלת טרנספורמציה תלת מימדית
+          slide.style.transform = `translateY(${translateY}px) translateZ(${translateZ}px) rotateY(${angle}deg)`;
+
+          // קביעת קלאס active
+          if (index === current) {
+            slide.classList.add('active');
+            systems[index].start(); // התחלת אנימציית חלקיקים לשקופית הפעילה
+          } else {
+            slide.classList.remove('active');
+            systems[index].stop(); // עצירת אנימציית חלקיקים לשקופיות לא פעילות
+          }
+        });
+         // עדכון צבע הרקע הדינמי בהתאם לסגנון הנוכחי והשקופית הפעילה
+        updateDynamicBackground();
+      }
+
+       // פונקציה לעדכון צבע הרקע הדינמי
+       function updateDynamicBackground() {
+           const style = body.className; // קבלת הסגנון הנוכחי
+           const slideIndex = current; // קבלת אינדקס השקופית הנוכחית
+
+           if (style.includes('style-cyber')) {
+               // בסגנון סייבר, צבע את הגריד הדינמי על גוף הדף
+               const baseColor = slideColors[slideIndex % slideColors.length]; // e.g., 'rgba(74, 35, 90, 0.8)'
+
+               // חלץ את רכיבי הצבע (RGB)
+               const rgbaMatch = baseColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d\.]+)\)/);
+               let r, g, b;
+               if (rgbaMatch) {
+                   r = rgbaMatch[1];
+                   g = rgbaMatch[2];
+                   b = rgbaMatch[3];
+               } else {
+                   // Fallback או טיפול בשגיאות אם פורמט הצבע אינו צפוי
+                   [r, g, b] = [233, 69, 96]; // רכיבי צבע סייבר ברירת מחדל
+               }
+
+               // הגדר צבע דינמי באמצעות רכיבי צבע הבסיס ושקיפות נמוכה עבור הגריד
+               const gridColor = `rgba(${r}, ${g}, ${b}, 0.15)`; // השתמש בשקיפות נמוכה יותר
+
+               // הגדרת גריד שונה לפי אינדקס השקופית
+               let backgroundImage;
+               switch(slideIndex % 4) { // שימוש במודולוס 4 לדוגמה (ניתן לשנות)
+                   case 0:
+                       backgroundImage = `
+                           repeating-linear-gradient(0deg, ${gridColor}, ${gridColor} 1px, transparent 1px, transparent 40px),
+                           repeating-linear-gradient(90deg, ${gridColor}, ${gridColor} 1px, transparent 1px, transparent 40px)
+                       `;
+                       body.style.backgroundSize = '40px 40px';
+                       break;
+                   case 1:
+                       backgroundImage = `
+                           repeating-linear-gradient(45deg, ${gridColor}, ${gridColor} 1px, transparent 1px, transparent 30px),
+                           repeating-linear-gradient(135deg, ${gridColor}, ${gridColor} 1px, transparent 1px, transparent 30px)
+                       `;
+                       body.style.backgroundSize = '30px 30px';
+                       break;
+                   case 2:
+                       backgroundImage = `
+                           repeating-linear-gradient(60deg, ${gridColor}, ${gridColor} 1px, transparent 1px, transparent 50px),
+                           repeating-linear-gradient(-30deg, ${gridColor}, ${gridColor} 1px, transparent 1px, transparent 50px)
+                       `;
+                       body.style.backgroundSize = '50px 50px';
+                       break;
+                   case 3:
+                       backgroundImage = `
+                           repeating-linear-gradient(0deg, ${gridColor}, ${gridColor} 2px, transparent 2px, transparent 20px),
+                           repeating-linear-gradient(90deg, ${gridColor}, ${gridColor} 2px, transparent 2px, transparent 20px)
+                       `;
+                       body.style.backgroundSize = '20px 20px';
+                       break;
+                   default: // ברירת מחדל
+                        backgroundImage = `
+                           repeating-linear-gradient(0deg, ${gridColor}, ${gridColor} 1px, transparent 1px, transparent 40px),
+                           repeating-linear-gradient(90deg, ${gridColor}, ${gridColor} 1px, transparent 1px, transparent 40px)
+                       `;
+                       body.style.backgroundSize = '40px 40px';
+                       break;
+               }
+               body.style.backgroundImage = backgroundImage;
+                body.style.backgroundColor = 'var(--mode-bg)'; // שמור על צבע הרקע הבסיסי
+                // הגדר את צבע ה-::before לשקוף במצב סייבר כי הוא לא נראה מאחורי שקופיות שקופות
+                body.style.setProperty('--slide-bg-color', 'transparent');
+
+
+           } else if (style.includes('style-comic')) {
+               // בסגנון קומיקס, הגדר את תמונת הרקע והצבע של הקומיקס
+               body.style.backgroundImage = `
+                 radial-gradient(circle at 50% 120%, rgba(255, 255, 255, 0.2) 20%, rgba(0, 0, 0, 0.2) 20%, rgba(0, 0, 0, 0.2) 30%, rgba(255, 255, 255, 0.2) 30%, rgba(255, 255, 255, 0.2) 40%, rgba(0, 0, 0, 0.2) 40%, rgba(0, 0, 0, 0.2) 50%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.2) 60%, rgba(0, 0, 0, 0.2) 60%, rgba(0, 0, 0, 0.2) 70%, rgba(255, 255, 255, 0.2) 70%, rgba(255, 255, 255, 0.2) 80%, rgba(0, 0, 0, 0.2) 80%, rgba(0, 0, 0, 0.2) 90%, rgba(255, 255, 255, 0.2) 90%),
+                 linear-gradient(to top, #fff59d 0%, #ffab40 100%)
+               `;
+               body.style.backgroundSize = '125% 100%';
+               body.style.backgroundColor = 'var(--mode-bg)'; // שמור על צבע הרקע הבסיסי
+                // האנימציה מטופלת ע"י CSS
+                // הגדר את צבע ה-::before לרקע השקופית עם שקיפות נמוכה
+                const bgColorForBefore = comicSlideColors[slideIndex % comicSlideColors.length].replace(/0\.6\)$/, '0.2)'); // השתמש בשקיפות נמוכה
+                body.style.setProperty('--slide-bg-color', bgColorForBefore);
+
+           } else {
+               // עבור סגנון ברירת המחדל (נקי)
+               body.style.backgroundImage = 'none'; // הסר תמונת רקע
+               body.style.backgroundSize = 'auto'; // אפס גודל רקע
+               body.style.backgroundColor = 'var(--mode-bg)'; // הגדר צבע רקע
+               // הגדר את צבע ה-::before לרקע השקופית עם שקיפות 20%
+                const bgColorForBefore = slideColors[slideIndex % slideColors.length].replace(/0\.8\)$/, '0.2)'); // השתמש בשקיפות 20%
+                body.style.setProperty('--slide-bg-color', bgColorForBefore);
+           }
+       }
+
+
+      // פונקציה לטיפול במעבר שקופית
+      function changeSlide(direction) {
+        if (isAnimating) return; // מניעת מעבר שקופית בזמן אנימציה
+
+        const total = slides.length;
+        const prev = current;
+        current = (current + direction + total) % total; // חישוב האינדקס החדש (עם עטיפה)
+
+        isAnimating = true; // קביעת דגל אנימציה
+        updateSlides(); // עדכון מיקומי השקופיות ומצב פעיל
+
+        // אנימציית פירוק אייקון בשקופית הקודמת ובניית אייקון בשקופית החדשה
+        animateIcons(slides[prev], 'deconstruct');
+        animateIcons(slides[current], 'construct');
+
+        // הסרת דגל אנימציה לאחר משך המעבר
+        setTimeout(() => {
+          isAnimating = false;
+        }, iconAnimationDuration); // שימוש במשך אנימציית האייקון
+      }
+
+      // פונקציה להפעלת אנימציית אייקונים
+      function animateIcons(slide, animationType) {
+          const iconContainer = slide.querySelector('.icon-container');
+          if (!iconContainer) return; // יציאה אם אין מכל אייקון
+
+          const iconParts = iconContainer.querySelectorAll('.icon-part');
+          iconParts.forEach(part => {
+              // הסרת קלאסים קודמים של אנימציה
+              part.classList.remove('construct', 'deconstruct');
+              // הפעלת reflow כדי להפעיל מחדש את האנימציה
+              void part.offsetWidth;
+              // הוספת קלאס האנימציה החדש
+              part.classList.add(animationType);
+          });
+      }
+
+      // הגדרה ראשונית: מיקום שקופיות והפעלת אנימציית אייקון ראשונה
+      updateSlides();
+      animateIcons(slides[current], 'construct');
+
+      // ניווט באמצעות גלגלת העכבר
+      window.addEventListener('wheel', (e) => {
+        const now = Date.now();
+        if (now - lastWheelTime < wheelThrottle) {
+            wheelDelta += e.deltaY; // צבירת דלתא אם האירועים מהירים מדי
+            return; // הגבלת קצב אירועי גלילה מהירים
+        }
+
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { // עדיפות לגלילה אנכית
+             if (e.deltaY > 0) {
+                changeSlide(1); // גלילה למטה, מעבר לשקופית הבאה
+              } else {
+                changeSlide(-1); // גלילה למעלה, מעבר לשקופית הקודמת
+              }
+             lastWheelTime = now; // עדכון זמן גלילה אחרון
+             wheelDelta = 0; // איפוס דלתא גלילה
+        } else if (Math.abs(wheelDelta) > 0) { // טיפול בדלתא שנצברה אם הגלילה האופקית הייתה דומיננטית
+             if (wheelDelta > 0) {
+                changeSlide(1);
+             } else {
+                changeSlide(-1);
+             }
+             lastWheelTime = now;
+             wheelDelta = 0;
+        }
+      }, { passive: false }); // שימוש ב-passive: false כדי לאפשר מניעת גלילת ברירת מחדל
+
+      // ניווט באמצעות מגע (החלקה למעלה/למטה)
+      let touchStartY = 0;
+      window.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          touchStartY = e.touches[0].clientY;
+          lastTap = Date.now(); // תיעוד זמן לחיצה לבדיקת לחיצה כפולה
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchend', (e) => {
+        if (e.changedTouches.length === 1) {
+          const touchEndY = e.changedTouches[0].clientY;
+          const deltaY = touchEndY - touchStartY;
+          const tapDuration = Date.now() - lastTap;
+
+          // בדיקה להחלקה
+          if (Math.abs(deltaY) > 50 && tapDuration < 500) { // מרחק החלקה מינימלי ומשך
+            if (deltaY < 0) {
+              changeSlide(1); // החחלקה למעלה, מעבר לשקופית הבאה
+            } else {
+              changeSlide(-1); // החלקה למטה, מעבר לשקופית הקודמת
+            }
+          }
+        }
+      }, { passive: true });
+
+      // ניווט באמצעות כפתורי מובייל
+      if (prevBtn && nextBtn) {
+          prevBtn.addEventListener('click', () => changeSlide(-1));
+          nextBtn.addEventListener('click', () => changeSlide(1));
+      }
+
+
+      // לחיצה על אייקון לפתיחת מודאל
+      slides.forEach(slide => {
+        const iconContainer = slide.querySelector('.icon-container');
+        const modal = slide.querySelector('.modal');
+        // בדיקה אם המודאל והכפתורים קיימים לפני קבלתם
+        const modalCloseButton = modal ? modal.querySelector('.modal-close') : null;
+        const iframe = modal ? modal.querySelector('.modal-iframe') : null;
+        const loadingSpinner = modal ? modal.querySelector('.modal-loading') : null;
+        const video = modal ? modal.querySelector('video') : null; // עבור מודאלי וידאו
+
+        if (iconContainer && modal) {
+          iconContainer.addEventListener('click', () => {
+            const now = Date.now();
+            if (now - lastIconTap < iconTapThrottle) {
+                return; // הגבלת קצב לחיצות מהירות על אייקונים
+            }
+            lastIconTap = now;
+
+            // פתיחת מודאל רק עבור השקופית הפעילה
+            if (slide.classList.contains('active')) {
+              modal.classList.add('active');
+              document.body.style.overflow = 'hidden'; // מניעת גלילת רקע
+
+              // טיפול בטעינת iframe
+              if (iframe) { // בדיקה אם iframe קיים
+                  if (loadingSpinner) loadingSpinner.style.display = 'block'; // הצגת ספינר אם קיים
+                  iframe.style.display = 'none'; // הסתרת iframe בהתחלה
+
+                  // האזנה לאירוע טעינת iframe
+                  iframe.onload = () => {
+                      if (loadingSpinner) loadingSpinner.style.display = 'none'; // הסתרת ספינר אם קיים
+                      iframe.style.display = 'block'; // הצגת iframe
+                  };
+                   // הפעלת טעינת iframe על ידי קביעת src שוב (גם אם כבר נקבע ב-HTML)
+                  iframe.src = iframe.src;
+              } else if (video && modal.id !== 'modal-line' && modal.id !== 'modal-diamond') { // בדיקה אם זה מודאל וידאו (למעט modal-line ו-modal-diamond)
+                 // אם זה מודאל וידאו, לוודא שהוידאו מתחיל להתנגן
+                 video.play().catch(error => {
+                     console.error("Error attempting to play video:", error);
+                     // טיפול בהגבלות הפעלה אוטומטית אם נדרש, למשל הצגת כפתור הפעלה
+                 });
+                 if (loadingSpinner) loadingSpinner.style.display = 'none'; // הסתרת ספינר לוידאו
+              } else if (modal.id === 'modal-line') {
+                  if (loadingSpinner) loadingSpinner.style.display = 'none';
+                  modal.dispatchEvent(new CustomEvent('modalOpen'));
+
+
+              } else if (modal.id === 'modal-diamond') {
+                   if (loadingSpinner) loadingSpinner.style.display = 'none';
+                   modal.dispatchEvent(new CustomEvent('modalOpen'));
+
+              } else if (modal && loadingSpinner) {
+                  // אם יש מודאל אך אין iframe, וידאו או טיפול מיוחד, הסתר ספינר מיד
+                   loadingSpinner.style.display = 'none';
+              }
+            }
+          });
+
+          // סגירת מודאל
+          if (modalCloseButton) { // בדיקה אם כפתור הסגירה קיים
+              modalCloseButton.addEventListener('click', () => {
+                modal.classList.remove('active');
+                document.body.style.overflow = ''; // שחזור גלילת רקע
+                 if (iframe) {
+                     try {
+                          iframe.contentWindow.postMessage('stopAnimation', '*');
+                          iframe.src = 'about:blank'; 
+                     } catch (e) {
+                         console.error("Could not interact with iframe:", e);
+                     }
+                 } else if (video && modal.id !== 'modal-line' && modal.id !== 'modal-diamond') {
+                     video.pause();
+                     video.currentTime = 0; 
+                 } else if (modal.id === 'modal-line') {
+                     modal.dispatchEvent(new CustomEvent('modalClose'));
+                 } else if (modal.id === 'modal-diamond') {
+                      modal.dispatchEvent(new CustomEvent('modalClose'));
+                 }
+              });
+          }
+
+
+          // סגירת מודאל בלחיצה על מקש Escape
+          document.addEventListener('keydown', (e) => {
+            const activeModal = document.querySelector('.modal.active');
+            if (e.key === 'Escape' && activeModal) {
+              activeModal.classList.remove('active');
+              document.body.style.overflow = '';
+               const activeIframe = activeModal.querySelector('.modal-iframe');
+               const activeVideo = activeModal.querySelector('video');
+               if (activeIframe) {
+                   try {
+                        activeIframe.contentWindow.postMessage('stopAnimation', '*');
+                        activeIframe.src = 'about:blank';
+                   } catch (e) {
+                       console.error("Could not interact with iframe:", e);
+                   }
+               } else if (activeVideo && activeModal.id !== 'modal-line' && activeModal.id !== 'modal-diamond') {
+                   activeVideo.pause();
+                   activeVideo.currentTime = 0;
+               } else if (activeModal.id === 'modal-line') {
+                    activeModal.dispatchEvent(new CustomEvent('modalClose'));
+
+               } else if (activeModal.id === 'modal-diamond') {
+                    activeModal.dispatchEvent(new CustomEvent('modalClose'));
+               }
+            }
+          });
+        }
+      });
+
+      // פונקציונליות של מחליף סגנונות
+      styleButtons.forEach(button => {
+          button.addEventListener('click', () => {
+              const style = button.dataset.style;
+              if (style === 'default') {
+                  document.body.className = ''; 
+              } else {
+                  document.body.className = ''; 
+                  document.body.classList.add(`style-${style}`); 
+              }
+
+              styleButtons.forEach(btn => btn.classList.remove('active'));
+              button.classList.add('active');
+              const newParticleColor = getComputedStyle(document.body).getPropertyValue('--icon-color') || '#e94560';
+               systems.forEach(system => {
+                   const slideIndex = slides.indexOf(system.canvas.parentElement); 
+                   system.particleColor = slideColors[slideIndex % slideColors.length];
+               });
+              updateDynamicBackground();
+          });
+      });
+
+
+      // טיפול בשינוי גודל חלון
+      window.addEventListener('resize', () => {
+        depth = Math.min(Math.max(window.innerHeight * 0.8, 600), 1000);
+        updateSlides(); 
+         const modalLine = document.getElementById('modal-line');
+         if (modalLine && modalLine.classList.contains('active')) {
+             window.dispatchEvent(new Event('resize'));
+         }
+         const modalDiamond = document.getElementById('modal-diamond');
+         if (modalDiamond && modalDiamond.classList.contains('active')) {
+             modalDiamond.dispatchEvent(new CustomEvent('resize'));
+         }
+      });
+
+       // הוספת ניווט מקלדת (מקשי חצים)
+        document.addEventListener('keydown', (e) => {
+            if (!document.querySelector('.modal.active')) { 
+                if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                    changeSlide(1);
+                } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                    changeSlide(-1);
+                }
+            }
+        });
+
+        // הפעלת אנימציית אייקון ראשונית לאחר טעינת הדף
+         setTimeout(() => {
+             animateIcons(slides[current], 'construct');
+         }, 100); 
+
+    });
+  </script>
+</body>
+</html>
