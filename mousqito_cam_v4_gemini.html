@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>גלאי יתושים משופר עם Gemini והיפוך מצלמה</title>
+    <style>
+        /* סגנונות בסיסיים לאיפוס וכיסוי מסך מלא */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100vh; /* גובה מסך מלא */
+            overflow: hidden; /* מונע גלילה */
+            background: #000; /* רקע שחור */
+            touch-action: none; /* מונע תנועות מגע ברירת מחדל */
+            user-select: none; /* מונע בחירת טקסט */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* וידאו וקנבס מכסים את כל המסך - מוסתרים בהתחלה */
+        video, canvas#overlay {
+            position: fixed; /* מיקום קבוע */
+            top: 0; left: 0; /* פינה שמאלית עליונה */
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* מכסה את האלמנט תוך שמירה על יחס גובה-רוחב */
+            display: none; /* מוסתר עד להפעלת המצלמה */
+        }
+
+        /* סדר שכבות */
+        video {
+            z-index: 1;
+        }
+
+        canvas#overlay {
+            z-index: 2;
+        }
+
+        /* הסתרת סמן העכבר במכשירי מגע */
+        @media (hover: none) {
+            canvas#overlay {
+                cursor: none;
+            }
+        }
+
+        /* סגנון תיבת הודעה */
+        #messageBox {
+            position: fixed;
+            bottom: 20px; /* מיקום בתחתית המסך */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 25px;
+            z-index: 10;
+            display: none; /* מוסתר כברירת מחדל */
+            text-align: center;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            max-width: 90%;
+        }
+        
+        /* אזור כפתורי שליטה */
+        #controls {
+            position: fixed;
+            bottom: 80px; /* מורם מעל תיבת ההודעות */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            gap: 10px; /* רווח בין הכפתורים */
+            flex-wrap: wrap; /* אפשר גלישה של כפתורים לשורה חדשה אם אין מקום */
+            justify-content: center;
+        }
+
+        /* כפתורים */
+        .controlButton {
+            padding: 10px 20px;
+            font-size: 15px;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            margin-bottom: 5px; /* רווח קטן אם הכפתורים גולשים */
+        }
+
+        .controlButton:hover {
+            background-color: #0056b3;
+        }
+        .controlButton:active {
+            transform: scale(0.95);
+        }
+
+        #analyzeButton {
+            background-color: #28a745; /* צבע ירוק לניתוח */
+        }
+        #analyzeButton:hover {
+            background-color: #1e7e34;
+        }
+        #flipCameraButton {
+            background-color: #ffc107; /* צבע צהוב להיפוך מצלמה */
+            color: #333;
+        }
+        #flipCameraButton:hover {
+            background-color: #e0a800;
+        }
+
+
+         /* סגנון לטעינה */
+        #loadingIndicator, #geminiLoadingIndicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            color: white;
+            padding: 20px;
+            background-color: rgba(0,0,0,0.75);
+            border-radius: 10px;
+            z-index: 12; /* גבוה יותר מרוב האלמנטים */
+            display: none; /* מוסתר כברירת מחדל */
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    
+    <div id="controls">
+        <button id="startButton" class="controlButton">הפעל מצלמה</button>
+        <button id="flipCameraButton" class="controlButton" style="display: none;">🔄 הפוך מצלמה</button>
+        <button id="analyzeButton" class="controlButton" style="display: none;">✨ מה זה היה?</button>
+    </div>
+
+    <div id="messageBox"></div>
+    <div id="loadingIndicator">טוען מצלמה...</div>
+    <div id="geminiLoadingIndicator">מעבד בקשה עם Gemini... ✨</div>
+
+
+    <script>
+        /* הגדרות */
+        const REGION = 7; 
+        const THR = 25; // הועלה מעט כדי להפחית רגישות כללית
+        const FRAME_MS = 120; 
+
+        const TRACK_LIFE = 2000; 
+        const PARTS = 16; 
+        const PART_R = 1; // הוקטן בחצי, היה 2
+        const PARTICLE_LIFE = 2000;
+        // סף לתנועת מצלמה - אם יותר מ-X% מהאזורים זזים, נניח שהמצלמה זזה
+        const CAMERA_MOTION_THRESHOLD_PERCENT = 0.6; // 60%
+
+        /* אלמנטים מה-DOM */
+        const video = document.getElementById('video');
+        const overlay = document.getElementById('overlay');
+        const ctx = overlay.getContext('2d');
+        const off = document.createElement('canvas');
+        const ofctx = off.getContext('2d');
+        const messageBox = document.getElementById('messageBox');
+        const startButton = document.getElementById('startButton');
+        const analyzeButton = document.getElementById('analyzeButton');
+        const flipCameraButton = document.getElementById('flipCameraButton');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const geminiLoadingIndicator = document.getElementById('geminiLoadingIndicator');
+
+
+        /* מצב האפליקציה */
+        let prev = null;
+        let last = performance.now();
+        let lastScan = 0;
+        const tracks = [];
+        const particles = [];
+        let center = { x: 0, y: 0 };
+        let tapT = 0;
+        let tapX = 0, tapY = 0;
+        let drag = null;
+        let dx = 0, dy = 0;
+        let fsRequested = false;
+        let cameraActive = false;
+        let lastGeminiAlertTime = 0; 
+        let currentFacingMode = 'environment'; // 'environment' (אחורית) או 'user' (קדמית)
+        let currentStream = null; // שמירת הזרם הנוכחי של המצלמה
+
+        /* פונקציה להצגת הודעה למשתמש */
+        function showMessage(message, duration = 5000) {
+            messageBox.textContent = message;
+            messageBox.style.display = 'block';
+            if (messageBox.timerId) {
+                clearTimeout(messageBox.timerId);
+            }
+            if (duration > 0) {
+                messageBox.timerId = setTimeout(() => {
+                    messageBox.style.display = 'none';
+                    messageBox.timerId = null;
+                }, duration);
+            }
+        }
+
+        /* בדיקת הקשר מאובטח */
+        function isSecureContext() {
+            return window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        }
+        
+        /* הפסקת זרם מצלמה קיים */
+        function stopCurrentCameraStream() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+            video.srcObject = null; // נקה את מקור הוידאו
+        }
+
+
+        /* אתחול מצלמה */
+        async function startCamera(facingMode) {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showMessage('שגיאה: הדפדפן שלך אינו תומך בגישה למצלמה (getUserMedia).');
+                loadingIndicator.style.display = 'none';
+                // החזר כפתורים למצב התחלתי אם נכשל
+                startButton.style.display = 'block';
+                analyzeButton.style.display = 'none';
+                flipCameraButton.style.display = 'none';
+                return false;
+            }
+
+            if (!isSecureContext() && !cameraActive) { // בדוק רק אם המצלמה לא פעילה עדיין
+                showMessage('לגישה למצלמה נדרש חיבור מאובטח (HTTPS) או הרצה מ-localhost.');
+                loadingIndicator.style.display = 'none';
+                startButton.style.display = 'block';
+                analyzeButton.style.display = 'none';
+                flipCameraButton.style.display = 'none';
+                return false;
+            }
+            
+            loadingIndicator.style.display = 'block'; 
+            startButton.style.display = 'none'; 
+            analyzeButton.style.display = 'none';
+            flipCameraButton.style.display = 'none';
+
+            stopCurrentCameraStream(); // עצור זרם קודם אם קיים
+
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode } });
+                video.srcObject = currentStream;
+                video.onloadedmetadata = () => {
+                    video.play().then(() => {
+                        resize();
+                        cameraActive = true;
+                        video.style.display = 'block'; 
+                        overlay.style.display = 'block'; 
+                        loadingIndicator.style.display = 'none'; 
+                        analyzeButton.style.display = 'block'; 
+                        flipCameraButton.style.display = 'block'; // הצג כפתור היפוך
+                        showMessage(`מצלמה (${facingMode === 'user' ? 'קדמית' : 'אחורית'}) הופעלה.`, 3000);
+                        if (!cameraActive) { // רק אם זו הפעלה ראשונה של לולאה
+                           requestAnimationFrame(loop);
+                        }
+                    }).catch(playError => {
+                        console.error('Error playing video:', playError);
+                        showMessage('שגיאה בניגון הוידאו: ' + playError.message);
+                        loadingIndicator.style.display = 'none';
+                        startButton.style.display = 'block';
+                    });
+                };
+                return true; // הצלחה
+            } catch (e) {
+                console.error(`Error accessing camera (facingMode: ${facingMode}):`, e);
+                let userMessage = `שגיאה בגישה למצלמה (${facingMode === 'user' ? 'קדמית' : 'אחורית'}): `;
+                if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+                    userMessage += 'ההרשאה נדחתה.';
+                } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+                    userMessage += 'לא נמצאה מצלמה מתאימה.';
+                } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError'  || e.name === 'OverconstrainedError') {
+                    userMessage += 'לא ניתן היה להשתמש במצלמה. ייתכן שהיא בשימוש או שהמצב המבוקש אינו נתמך.';
+                } else {
+                    userMessage += e.message;
+                }
+                showMessage(userMessage);
+                loadingIndicator.style.display = 'none';
+                startButton.style.display = 'block'; // אפשר למשתמש לנסות שוב
+                return false; // כישלון
+            }
+        }
+        
+        /* פונקציה ראשית להפעלת המצלמה (מופעלת מכפתור) */
+        async function handleStartCameraButtonClick() {
+            await startCamera(currentFacingMode);
+        }
+
+        /* פונקציה להיפוך מצלמה */
+        async function flipCamera() {
+            if (!cameraActive) return;
+            currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+            showMessage(`מעביר למצלמה ${currentFacingMode === 'user' ? 'קדמית' : 'אחורית'}...`, 2000);
+            await startCamera(currentFacingMode);
+        }
+
+
+        /* שינוי גודל הקנבס */
+        function resize() {
+            if (!cameraActive) return; 
+            overlay.width = video.videoWidth || window.innerWidth;
+            overlay.height = video.videoHeight || window.innerHeight;
+            off.width = overlay.width / 4;
+            off.height = overlay.height / 4;
+            center = { x: overlay.width / 2, y: overlay.height / 2 };
+        }
+
+        window.addEventListener('resize', resize);
+        startButton.addEventListener('click', handleStartCameraButtonClick);
+        analyzeButton.addEventListener('click', handleAnalyzeButtonClick);
+        flipCameraButton.addEventListener('click', flipCamera);
+
+
+        /* פונקציה לקריאה ל-Gemini API */
+        async function callGeminiAPI(promptText, isProactive = false) {
+            geminiLoadingIndicator.style.display = 'block';
+            if (isProactive) {
+                 console.log("פונה ל-Gemini להתראה פרואקטיבית...");
+            }
+
+            let chatHistory = [{ role: "user", parts: [{ text: promptText }] }];
+            const payload = { contents: chatHistory };
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Gemini API error:', errorData);
+                    throw new Error(` ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    showMessage(`✨ Gemini: ${text}`, 15000); 
+                } else {
+                    console.error('Unexpected Gemini API response structure:', result);
+                    if (result.promptFeedback && result.promptFeedback.blockReason){
+                         showMessage(`בקשה נחסמה מ-Gemini: ${result.promptFeedback.blockReason}`, 7000);
+                    } else {
+                         showMessage("תשובה לא צפויה מ-Gemini.", 5000);
+                    }
+                }
+            } catch (error) {
+                console.error('Error calling Gemini API:', error);
+                showMessage(`שגיאה בפנייה ל-Gemini:${error.message}`, 7000);
+            } finally {
+                geminiLoadingIndicator.style.display = 'none';
+            }
+        }
+
+        /* טיפול בלחיצה על כפתור ניתוח תנועה */
+        function handleAnalyzeButtonClick() {
+            if (!cameraActive) {
+                showMessage("יש להפעיל את המצלמה תחילה.", 3000);
+                return;
+            }
+            const currentTracks = tracks.length;
+            const currentParticles = particles.length;
+            let movementDescription = "לא זוהתה תנועה משמעותית כרגע.";
+            if (currentTracks > 0 || currentParticles > 0) {
+                 movementDescription = `זוהתה תנועה במצלמה. כרגע יש ${currentTracks} נקודות מעקב פעילות ו-${currentParticles} חלקיקים נעים.`;
+            }
+
+            const prompt = `${movementDescription} מה לדעתך יכולה להיות התנועה הזו? האם זה יכול להיות יתוש, זבוב או חרק אחר? תן לי ניחוש יצירתי והסבר קצר (עד 2 משפטים).`;
+            
+            showMessage("שולח בקשה ל-Gemini לניתוח... ✨", 2000);
+            callGeminiAPI(prompt);
+        }
+
+
+        /* העברת אירועי מצביע */
+        ['pointerdown', 'pointermove', 'pointerup'].forEach(evt => {
+            document.body.addEventListener(evt, e => {
+                if (!cameraActive) return;
+                if (!fsRequested && (evt === 'pointerdown' || evt === 'pointermove')) {
+                    // ניסיון למסך מלא - יכול להיות חסום על ידי הדפדפן אם לא באינטראקציה ישירה
+                    // document.documentElement.requestFullscreen().catch(err => {
+                    //     console.warn("Fullscreen request failed:", err);
+                    // });
+                    fsRequested = true; 
+                }
+                const type = evt === 'pointerdown' ? 'mousedown' : evt === 'pointermove' ? 'mousemove' : 'mouseup';
+                const newEvent = new MouseEvent(type, {
+                    clientX: e.clientX, clientY: e.clientY, bubbles: true, cancelable: true, view: window, relatedTarget: e.relatedTarget
+                });
+                overlay.dispatchEvent(newEvent);
+            });
+        });
+
+
+        /* אינטראקציית עכבר/מגע על שכבת העל */
+        overlay.addEventListener('mousedown', e => {
+            if (!cameraActive) return;
+            const { x, y } = toCanvas(e);
+            const now = performance.now();
+            if (now - tapT < 300 && Math.hypot(x - tapX, y - tapY) < 20) {
+                freezeParticle(x, y);
+                tapT = 0;
+            } else {
+                tapT = now;
+                tapX = x;
+                tapY = y;
+                drag = particles.find(p => p.persistent && Math.hypot(p.x - x, p.y - y) < 15);
+                if (drag) {
+                    dx = x - drag.x;
+                    dy = y - drag.y;
+                }
+            }
+        });
+
+        overlay.addEventListener('mousemove', e => {
+            if (!cameraActive || !drag) return;
+            const { x, y } = toCanvas(e);
+            drag.x = x - dx;
+            drag.y = y - dy;
+        });
+
+        ['mouseup', 'mouseleave'].forEach(ev => overlay.addEventListener(ev, () => {
+            if (!cameraActive) return;
+            drag = null;
+        }));
+
+        function toCanvas(e) {
+            const rect = overlay.getBoundingClientRect();
+            return {
+                x: (e.clientX - rect.left) * (overlay.width / rect.width),
+                y: (e.clientY - rect.top) * (overlay.height / rect.height)
+            };
+        }
+
+        function freezeParticle(x, y) {
+            if (!cameraActive) return;
+            for (const p of particles) {
+                if (Math.hypot(p.x - x, p.y - y) < 15) {
+                    p.persistent = true;
+                    p.vx = p.vy = 0;
+                    return;
+                }
+            }
+        }
+
+        let firstLoop = true; // משתנה שיעזור להפעיל את הלולאה רק פעם אחת בהתחלה
+        function loop(t) {
+            if (firstLoop) { // אם זו הפעם הראשונה, אפס את המשתנה
+                firstLoop = false;
+            }
+            if (!cameraActive || video.readyState < 2) { 
+                if (!firstLoop) requestAnimationFrame(loop); // המשך רק אם לא הפעם הראשונה
+                return;
+            }
+
+            if (t - lastScan > FRAME_MS) {
+                scan();
+                lastScan = t;
+            }
+            const dt = (t - last) / 16.67;
+            last = t;
+            updateParticles(dt);
+            draw();
+            clean();
+            requestAnimationFrame(loop);
+        }
+
+        function scan() {
+            if (!cameraActive || !off.width || !off.height) return; // ודא שלקנבס מחוץ למסך יש מידות
+            ofctx.drawImage(video, 0, 0, off.width, off.height);
+            const data = ofctx.getImageData(0, 0, off.width, off.height).data;
+
+            if (prev) {
+                let newlyDetectedRegionsInScan = 0;
+                const totalRegions = (off.height / REGION) * (off.width / REGION);
+
+                for (let y = 0; y < off.height; y += REGION) {
+                    for (let x = 0; x < off.width; x += REGION) {
+                        let diff = 0;
+                        let count = 0;
+                        for (let dy = 0; dy < REGION; dy += 3) {
+                            for (let dx = 0; dx < REGION; dx += 3) {
+                                const i = ((y + dy) * off.width + x + dx) * 4;
+                                if (i < data.length && i < prev.length) { // בדיקת גבולות
+                                    diff += Math.abs(data[i] - prev[i]) +
+                                            Math.abs(data[i + 1] - prev[i + 1]) +
+                                            Math.abs(data[i + 2] - prev[i + 2]);
+                                    count++;
+                                }
+                            }
+                        }
+                        if (count > 0 && (diff / count > THR)) {
+                            newlyDetectedRegionsInScan++;
+                            // הוספת נקודות מעקב וחלקיקים תתבצע רק אם זו לא תנועת מצלמה גדולה
+                        }
+                    }
+                }
+                
+                // בדיקה אם זו תנועת מצלמה גדולה
+                if (newlyDetectedRegionsInScan / totalRegions > CAMERA_MOTION_THRESHOLD_PERCENT) {
+                    // console.log("Large camera movement detected, skipping particle generation.");
+                    prev = data.slice(0); // עדכן את הפריים הקודם אך אל תיצור חלקיקים
+                    return; // דלג על יצירת חלקיקים והתראות Gemini בסריקה זו
+                }
+
+
+                // אם לא זוהתה תנועת מצלמה גדולה, המשך כרגיל
+                // עכשיו נעבור שוב על האזורים כדי ליצור חלקיקים רק באזורים שבאמת זוהתה בהם תנועה
+                // (לאחר שווידאנו שזו לא תנועה גלובלית של המצלמה)
+                let actualMovementRegions = 0;
+                 for (let y = 0; y < off.height; y += REGION) {
+                    for (let x = 0; x < off.width; x += REGION) {
+                        let diff = 0;
+                        let count = 0;
+                        for (let dy = 0; dy < REGION; dy += 3) {
+                            for (let dx = 0; dx < REGION; dx += 3) {
+                                const i = ((y + dy) * off.width + x + dx) * 4;
+                                 if (i < data.length && i < prev.length) {
+                                    diff += Math.abs(data[i] - prev[i]) +
+                                            Math.abs(data[i + 1] - prev[i + 1]) +
+                                            Math.abs(data[i + 2] - prev[i + 2]);
+                                    count++;
+                                }
+                            }
+                        }
+                        if (count > 0 && (diff / count > THR)) {
+                            actualMovementRegions++;
+                            const rx = (x + REGION / 2) * (overlay.width / off.width);
+                            const ry = (y + REGION / 2) * (overlay.height / off.height);
+                            tracks.push({ x: rx, y: ry, birth: Date.now() });
+                            spawnParticles(rx, ry, Date.now());
+                        }
+                    }
+                }
+
+
+                // בדיקה להתראה פרואקטיבית מ-Gemini
+                const SIGNIFICANT_MOVEMENT_THRESHOLD = 3; 
+                const MIN_ALERT_INTERVAL = 30000; 
+
+                if (actualMovementRegions >= SIGNIFICANT_MOVEMENT_THRESHOLD &&
+                    (Date.now() - lastGeminiAlertTime > MIN_ALERT_INTERVAL)) {
+                    
+                    lastGeminiAlertTime = Date.now();
+                    console.log(`Triggering proactive Gemini alert: ${actualMovementRegions} regions moved.`);
+                    const alertPrompt = `באפליקציית "גלאי היתושים" שלי זוהתה תנועה רבה ופתאומית (${actualMovementRegions} אזורים זזו). כנראה יתוש או חרק מעופף אחר! תן לי בבקשה עובדה מעניינת אחת או טיפ קצר ושימושי בנושא יתושים או חרקים מעופפים (עד 2 משפטים). ✨`;
+                    callGeminiAPI(alertPrompt, true); 
+                }
+            }
+            prev = data.slice(0);
+        }
+
+        function spawnParticles(x, y, birth) {
+            if (!cameraActive) return;
+            for (let i = 0; i < PARTS; i++) {
+                const ang = Math.random() * Math.PI * 2;
+                const spd = 1 + Math.random() * 1.1;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+                    birth, life: PARTICLE_LIFE, persistent: false
+                });
+            }
+        }
+
+        function updateParticles(dt) {
+            if (!cameraActive) return;
+            const now = Date.now();
+            particles.forEach(p => {
+                if (!p.persistent) {
+                    p.x += p.vx * dt; p.y += p.vy * dt;
+                    p.vy += 0.02 * dt;
+                    if (overlay.width > 0 && overlay.height > 0) { // ודא שיש מידות לקנבס
+                        if (p.x < PART_R || p.x > overlay.width - PART_R) p.vx *= -0.9;
+                        if (p.y < PART_R || p.y > overlay.height - PART_R) p.vy *= -0.9;
+                        p.x = Math.max(PART_R, Math.min(overlay.width - PART_R, p.x));
+                        p.y = Math.max(PART_R, Math.min(overlay.height - PART_R, p.y));
+                    }
+                    p.life = PARTICLE_LIFE - (now - p.birth);
+                }
+            });
+            for (let i = particles.length - 1; i >= 0; i--) {
+                if (!particles[i].persistent && particles[i].life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function lerp(r1, g1, b1, r2, g2, b2, t) {
+            return 'rgb(' +
+                (r1 + (r2 - r1) * t | 0) + ',' + (g1 + (g2 - g1) * t | 0) + ',' + (b1 + (b2 - b1) * t | 0) + ')';
+        }
+
+        function draw() {
+            if (!cameraActive || !overlay.width || !overlay.height) return; // ודא שיש מידות לקנבס
+            ctx.clearRect(0, 0, overlay.width, overlay.height);
+            const now = Date.now();
+
+            tracks.forEach(tr => {
+                const age = now - tr.birth;
+                const t = Math.min(age / TRACK_LIFE, 1);
+                const color = lerp(255, 0, 40, 0, 234, 255, t); 
+                ctx.strokeStyle = color; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(tr.x, tr.y, 14, 0, Math.PI * 2); ctx.stroke();
+            });
+
+            particles.forEach(p => {
+                const t = Math.min((Date.now() - p.birth) / PARTICLE_LIFE, 1);
+                ctx.fillStyle = lerp(255, 0, 40, 0, 234, 255, t); 
+                ctx.beginPath(); ctx.arc(p.x, p.y, PART_R, 0, Math.PI * 2); ctx.fill();
+            });
+        }
+
+        function clean() {
+            if (!cameraActive) return;
+            const now = Date.now();
+            for (let i = tracks.length - 1; i >= 0; i--) {
+                if (now - tracks[i].birth > TRACK_LIFE) tracks.splice(i, 1);
+            }
+        }
+        
+        showMessage("לחץ על 'הפעל מצלמה' כדי להתחיל.", 0); 
+
+    </script>
+</body>
+</html>
